@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+
+# Electron Builder
+release/
+*.blockmap
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+*.snap
+*.zip
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+*.pid
+*.pid.lock
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Coverage
+coverage/
+
+# Local configuration
+*.local
+
+# Electron development
+electron-debug.log
+
+# Backup files
+*.bak
+*.tmp
+*.swp
+*.swo
+*~
+
+# Generated reports
+reports/
+
+# Local application data
+data/local/
