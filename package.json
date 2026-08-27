@@ -10,5 +10,13 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^44.0.0"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.23",
+    "electron-store": "^8.2.0",
+    "fast-xml-parser": "^5.11.0",
+    "fs-extra": "^11.4.0",
+    "pdfkit": "^0.20.1",
+    "xlsx": "^0.18.5"
   }
 }

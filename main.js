@@ -1,12 +1,16 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const { registerIpcHandlers } = require('./src/main/ipcHandlers');
+
+let mainWindow = null;
 
 function createWindow() {
-    const win = new BrowserWindow({
+    mainWindow = new BrowserWindow({
         width: 1440,
         height: 900,
         minWidth: 1100,
         minHeight: 700,
+        backgroundColor: '#F7F4EF',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -14,8 +18,14 @@ function createWindow() {
         }
     });
 
-    win.loadFile(path.join(__dirname, 'render', 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, 'render', 'index.html'));
+
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+    });
 }
+
+registerIpcHandlers(() => mainWindow);
 
 app.whenReady().then(() => {
     createWindow();

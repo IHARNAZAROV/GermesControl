@@ -1,0 +1,95 @@
+/* ---------- Page header ---------- */
+.page-title { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+.page-subtitle { color: var(--color-text-secondary); font-size: 13px; margin-bottom: 20px; }
+
+/* ---------- Dashboard ---------- */
+.dash-hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 22px;
+}
+.dash-hero h1 { font-size: 24px; font-weight: 800; }
+.dash-hero .lead { color: var(--color-text-secondary); font-size: 13.5px; margin-top: 6px; max-width: 480px; }
+
+.grid-2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; margin-top: 20px; }
+
+.donut-wrap { display: flex; align-items: center; gap: 26px; }
+.donut-center-label { text-align: center; }
+.donut-center-label .pct { font-size: 30px; font-weight: 800; color: var(--color-primary-dark); }
+.donut-center-label .caption { font-size: 11.5px; color: var(--color-text-secondary); }
+.donut-legend { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.donut-legend-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.donut-legend-row .label { flex: 1; color: var(--color-text-secondary); }
+.donut-legend-row .count { font-weight: 700; width: 40px; text-align: right; }
+.donut-legend-row .pct { width: 44px; text-align: right; color: var(--color-text-secondary); }
+
+.issues-list { display: flex; flex-direction: column; }
+.issues-row { display: grid; grid-template-columns: 1.1fr 1.4fr 0.8fr 0.7fr; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--color-border); font-size: 12.5px; align-items: center; }
+.issues-row:last-child { border-bottom: none; }
+.issues-row.head { color: var(--color-text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+.issues-link { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary); font-weight: 700; font-size: 12.5px; margin-top: 10px; cursor: pointer; }
+
+.status-bar {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+}
+.status-bar .status-main { display: flex; align-items: center; gap: 12px; }
+.status-bar .status-icon { width: 34px; height: 34px; border-radius: 50%; background: var(--color-success-bg); color: var(--color-success); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.status-bar .status-title { font-weight: 700; font-size: 14px; }
+.status-bar .status-sub { color: var(--color-text-secondary); font-size: 12.5px; margin-top: 2px; }
+.status-bar .status-time { text-align: right; font-size: 12px; color: var(--color-text-secondary); margin-right: 16px; }
+.status-bar .status-time .value { font-weight: 700; color: var(--color-text); }
+
+/* ---------- Objects / generic detail drawer ---------- */
+.presence-chip { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+.presence-chip.ok { background: var(--color-success-bg); color: var(--color-success); }
+.presence-chip.no { background: var(--color-danger-bg); color: var(--color-danger); }
+.presence-chip.warn { background: var(--color-warning-bg); color: var(--color-warning); }
+
+.field-diff-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 10px; }
+.field-diff-card .field-name { font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+.field-diff-values { display: flex; gap: 18px; flex-wrap: wrap; }
+.field-diff-values .fv { font-size: 12.5px; }
+.field-diff-values .fv .src { color: var(--color-text-secondary); margin-right: 4px; }
+
+/* ---------- Comparison categories ---------- */
+.cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+.cat-card { padding: 16px; text-align: center; }
+.cat-card .cat-value { font-size: 24px; font-weight: 800; }
+.cat-card .cat-label { font-size: 12px; color: var(--color-text-secondary); margin-top: 4px; }
+
+/* ---------- Errors center ---------- */
+.errors-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+
+/* ---------- Analytics ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.stat-tile { padding: 14px; text-align: center; }
+.stat-tile .v { font-size: 20px; font-weight: 800; }
+.stat-tile .l { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 4px; }
+.chart-tabs { display: flex; gap: 8px; margin: 16px 0; }
+
+/* ---------- Reports ---------- */
+.report-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.report-card { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.report-card .r-title { font-weight: 700; font-size: 14px; }
+.report-card .r-desc { font-size: 12px; color: var(--color-text-secondary); }
+.format-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- Import view ---------- */
+.import-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.import-card { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.import-card .imp-title { font-weight: 700; font-size: 14px; }
+.import-card .imp-file { font-size: 12.5px; color: var(--color-text-secondary); }
+.import-card .imp-count { font-size: 22px; font-weight: 800; }
+
+/* ---------- Settings ---------- */
+.settings-section { margin-bottom: 26px; max-width: 520px; }
+
+@media (max-width: 1200px) {
+    .kpi-grid, .cat-grid, .stat-grid, .import-grid, .report-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+}

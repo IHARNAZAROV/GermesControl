@@ -1,0 +1,58 @@
+const listeners = new Set();
+
+export const store = {
+    sources: { site: { data: [], meta: {} }, ilvo: { data: [], meta: {} }, kufar: { data: [], meta: {} } },
+    contracts: [],
+    report: null,
+    history: [],
+    settings: {},
+    checking: false
+};
+
+export function subscribe(fn) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+}
+
+function notify() {
+    for (const fn of listeners) fn(store);
+}
+
+export async function loadState() {
+    const state = await window.electronAPI.getState();
+    Object.assign(store, state);
+    notify();
+    return store;
+}
+
+export async function importSource(sourceKey) {
+    const result = await window.electronAPI.selectAndImportFile(sourceKey);
+    if (!result.canceled) {
+        await loadState();
+    }
+    return result;
+}
+
+export async function importKufarFromUrl(url) {
+    const result = await window.electronAPI.importKufarFromUrl(url);
+    await loadState();
+    return result;
+}
+
+export async function runCheck() {
+    store.checking = true;
+    notify();
+    try {
+        const report = await window.electronAPI.runCheck();
+        await loadState();
+        return report;
+    } finally {
+        store.checking = false;
+        notify();
+    }
+}
+
+export async function resetSampleData() {
+    await window.electronAPI.resetSampleData();
+    await loadState();
+}

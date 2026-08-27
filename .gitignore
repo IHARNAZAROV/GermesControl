@@ -68,3 +68,6 @@ reports/
 
 # Local application data
 data/local/
+# Runtime application data (state, uploads, reports) - regenerated on first launch
+/data/*
+!/data/.gitkeep
