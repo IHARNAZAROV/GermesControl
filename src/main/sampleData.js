@@ -10,6 +10,8 @@
  * из технического задания (247 / 231 / 224 / ~29 проблем).
  */
 
+const { extractContractKey, normalizeAddressKey } = require('./schema');
+
 const CITIES = ['Минск', 'Гродно', 'Брест', 'Витебск', 'Могилёв', 'Гомель'];
 const TYPES = ['Квартира', 'Дом', 'Коммерческая', 'Участок'];
 const DEAL_TYPES = ['Продажа', 'Аренда'];
@@ -117,6 +119,9 @@ function buildSampleDataset() {
             const siteRec = cloneFor('site', base);
             const ilvoRec = cloneFor('ilvo', base);
             const kufarRec = cloneFor('kufar', base);
+            siteRec.source = 'site';
+            ilvoRec.source = 'ilvo';
+            kufarRec.source = 'kufar';
 
             // Расхождения полей между источниками (только если объект есть в 2+ источниках).
             const presentCount = [group.site, group.ilvo, group.kufar].filter(Boolean).length;
@@ -133,6 +138,11 @@ function buildSampleDataset() {
                 } else if (roll < 0.17 && contractNumber && group.site && group.ilvo) {
                     ilvoRec.contractNumber = `№${contractSeq + 500}`;
                 }
+            }
+
+            for (const rec of [siteRec, ilvoRec, kufarRec]) {
+                rec.contractKey = extractContractKey(rec.contractNumber);
+                rec.addressKey = normalizeAddressKey(rec.city, rec.address);
             }
 
             if (group.site) site.push(siteRec);

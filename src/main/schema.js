@@ -6,10 +6,10 @@
  */
 const OBJECT_FIELDS = [
     { key: 'id', label: 'ID', compare: false },
-    { key: 'title', label: 'Название', compare: true },
+    { key: 'title', label: 'Название', compare: false },
     { key: 'type', label: 'Тип объекта', compare: true },
     { key: 'dealType', label: 'Тип сделки', compare: true },
-    { key: 'city', label: 'Город', compare: true },
+    { key: 'city', label: 'Город', compare: false },
     { key: 'address', label: 'Адрес', compare: true },
     { key: 'price', label: 'Цена', compare: true, numeric: true, unit: 'BYN' },
     { key: 'priceUsd', label: 'Цена USD', compare: true, numeric: true, unit: 'USD' },
@@ -66,4 +66,49 @@ const ERROR_SEVERITY = {
     [ERROR_TYPES.OTHER]: SEVERITY.INFO
 };
 
-module.exports = { OBJECT_FIELDS, SOURCES, ERROR_TYPES, SEVERITY, ERROR_SEVERITY };
+/**
+ * Извлекает нормализованный «ключ договора» из произвольного текста
+ * (например, "Договор №1/1 от 01.07.2026" -> "1/1", "2/1" -> "2/1",
+ * "№4561" -> "4561"). Используется как основной ключ сопоставления
+ * одного и того же объекта между Сайтом и ILVO.
+ */
+function extractContractKey(raw) {
+    if (raw === undefined || raw === null) return null;
+    let s = String(raw).trim();
+    if (!s || s === '-') return null;
+    const slashMatch = s.match(/(\d+[\/\-][0-9A-Za-zА-Яа-яЁё]*\d*)/);
+    if (slashMatch) return slashMatch[1].replace(/\s+/g, '');
+    s = s.replace(/^№\s*/, '').trim();
+    return s || null;
+}
+
+const ADDRESS_STOPWORDS = /\b(ул|улица|пр|проспект|пер|переулок|б-р|бульвар|бр|д|дом|г|город|пос|посёлок|поселок|ст|аг|агрогородок)\b\.?/g;
+
+/**
+ * Очищает произвольный адресный текст: убирает пунктуацию и типовые
+ * сокращения (ул., д., г., пос. ...), приводит к нижнему регистру.
+ * Используется и для ключа сопоставления объектов, и для нестрогого
+ * сравнения адреса между источниками (см. compare.js).
+ */
+function cleanLocationText(s) {
+    return String(s || '')
+        .toLowerCase()
+        .replace(/[«»"'.,№]/g, ' ')
+        .replace(ADDRESS_STOPWORDS, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Строит запасной («резервный») ключ сопоставления по адресу —
+ * используется, когда номер договора отсутствует хотя бы в одном
+ * источнике или отличается по формату.
+ */
+function normalizeAddressKey(city, address) {
+    const c = cleanLocationText(city);
+    const a = cleanLocationText(address);
+    if (!c && !a) return null;
+    return `${c}|${a}`;
+}
+
+module.exports = { OBJECT_FIELDS, SOURCES, ERROR_TYPES, SEVERITY, ERROR_SEVERITY, extractContractKey, normalizeAddressKey, cleanLocationText };
