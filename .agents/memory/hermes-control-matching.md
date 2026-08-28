@@ -50,6 +50,18 @@ matching.
 `cleanLocationText`, test both Cyrillic and Latin variants instead of relying
 on `\b` around Cyrillic text.
 
+## Free-text area units
+When normalizing Russian area units in descriptions, use explicit letter/digit
+lookarounds. A global replacement of the standalone-looking Cyrillic `м`
+without boundaries also changes words such as `дом` and can create false
+numeric matches.
+
+**Why:** ILVO descriptions mix `м²`, `м2`, and `кв. м`; an unbounded unit
+replacement once transformed ordinary words before area extraction.
+
+**How to apply:** normalize only `м²`/`м2`/standalone `м`/`кв. м`, then prefer
+explicit total-area phrases before any short-form fallback.
+
 ## Price as supporting evidence
 Price is a corroborating signal, not a standalone identity key. Use it to
 strengthen and disambiguate an address match; without a contract or address,

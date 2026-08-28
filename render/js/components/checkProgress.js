@@ -6,7 +6,7 @@ import { showToast } from './toast.js';
 const STEPS = [
     'Сайт',
     'ILVO',
-    'XML Kufar',
+    'Kufar',
     'Сравнение объектов',
     'Проверка договоров',
     'Проверка цен',

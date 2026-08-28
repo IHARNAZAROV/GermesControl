@@ -22,10 +22,10 @@ export function renderComparison(container) {
         ['Есть везде', cat.everywhere],
         ['Только на сайте', cat.onlySite],
         ['Только в ILVO', cat.onlyIlvo],
-        ['Только в XML/Kufar', cat.onlyKufar],
+        ['Только в Kufar', cat.onlyKufar],
         ['Нет на сайте', cat.missingSite],
         ['Нет в ILVO', cat.missingIlvo],
-        ['Нет в XML/Kufar', cat.missingKufar]
+        ['Нет в Kufar', cat.missingKufar]
     ];
     container.appendChild(el('div', { class: 'cat-grid' }, cards.map(([label, value]) =>
         el('div', { class: 'card cat-card' }, [
@@ -59,7 +59,7 @@ export function renderComparison(container) {
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
                 { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => chip(o.presence.site) },
                 { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => chip(o.presence.ilvo) },
-                { key: 'kufar', label: 'XML / Kufar', sortValue: (o) => o.presence.kufar, render: (o) => chip(o.presence.kufar) }
+                { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => chip(o.presence.kufar) }
             ],
             rows,
             searchFields: ['objectNumber', 'title', 'city', 'address', 'contractNumber'],

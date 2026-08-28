@@ -75,7 +75,7 @@ export function renderDashboard(container) {
     const kpis = el('div', { class: 'kpi-grid' }, [
         kpiCard({ icon: 'building', value: stats.siteCount, label: 'Объекты на сайте', delta: deltas.site, featured: true }),
         kpiCard({ icon: 'database', value: stats.ilvoCount, label: 'Объекты в ILVO', delta: deltas.ilvo }),
-        kpiCard({ icon: 'compare', value: stats.kufarCount, label: 'Объекты в XML Kufar', delta: deltas.kufar }),
+        kpiCard({ icon: 'compare', value: stats.kufarCount, label: 'Объекты в Kufar', delta: deltas.kufar }),
         kpiCard({ icon: 'alert', value: stats.problemsCount, label: 'Проблемы', danger: true, delta: deltas.problems })
     ]);
     container.appendChild(kpis);
@@ -84,7 +84,7 @@ export function renderDashboard(container) {
     const segments = [
         { label: 'На всех площадках', value: cat.everywhere, color: '#155945' },
         { label: 'Отсутствуют на сайте', value: cat.missingSite, color: '#D97706' },
-        { label: 'Отсутствуют в XML', value: cat.missingKufar, color: '#DC2626' },
+        { label: 'Отсутствуют в Kufar', value: cat.missingKufar, color: '#DC2626' },
         { label: 'Отсутствуют в ILVO', value: cat.missingIlvo, color: '#6B7280' }
     ];
     const total = segments.reduce((s, x) => s + x.value, 0) || 1;

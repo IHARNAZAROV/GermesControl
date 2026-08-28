@@ -36,7 +36,7 @@ export function renderSettings(container) {
     const sourceSection = el('div', { class: 'card card-pad settings-section' }, [
         el('div', { class: 'card-title' }, 'Источники данных'),
         el('div', { class: 'form-row', style: 'margin-top:14px;' }, [
-            el('label', {}, 'Ссылка на XML-выгрузку Kufar (ILVO)'),
+            el('label', {}, 'Ссылка на выгрузку Kufar (ILVO)'),
             el('input', { id: 'set-kufar-url', value: s.kufarXmlUrl || '' })
         ]),
         el('button', {

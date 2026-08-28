@@ -27,7 +27,7 @@ const OBJECT_FIELDS = [
 const SOURCES = {
     site: { key: 'site', label: 'Сайт ГермесГарант', short: 'Сайт', format: 'JSON' },
     ilvo: { key: 'ilvo', label: 'ILVO CRM', short: 'ILVO', format: 'XLSX' },
-    kufar: { key: 'kufar', label: 'Kufar (XML)', short: 'Kufar', format: 'XML' }
+    kufar: { key: 'kufar', label: 'Kufar', short: 'Kufar', format: 'XML' }
 };
 
 const ERROR_TYPES = {
@@ -36,7 +36,7 @@ const ERROR_TYPES = {
     DUPLICATE_CONTRACT: 'Дубликат договора',
     MISSING_SITE: 'Объект отсутствует на сайте',
     MISSING_ILVO: 'Объект отсутствует в ILVO',
-    MISSING_KUFAR: 'Объект отсутствует в XML Kufar',
+    MISSING_KUFAR: 'Объект отсутствует в Kufar',
     PRICE_MISMATCH: 'Разная цена',
     AREA_MISMATCH: 'Разная площадь',
     ADDRESS_MISMATCH: 'Разный адрес',

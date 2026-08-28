@@ -102,25 +102,6 @@ export function renderObjects(container) {
         return;
     }
 
-    container.appendChild(el('div', { class: 'card card-pad matching-rules' }, [
-        el('div', { class: 'card-title' }, 'Как система объединяет записи'),
-        el('div', { class: 'matching-rules-grid' }, [
-            el('div', {}, [
-                el('div', { class: 'matching-rule-title' }, '1. Договор — главный ключ'),
-                el('div', { class: 'text-secondary' }, '«41/1», «Договор 41/1» и «Договор 41/1 от 01.07.2026» считаются одним номером.')
-            ]),
-            el('div', {}, [
-                el('div', { class: 'matching-rule-title' }, '2. Адрес — резервный ключ'),
-                el('div', { class: 'text-secondary' }, 'Улица и номер дома сравниваются после очистки сокращений, регистра и лишних пробелов.')
-            ]),
-            el('div', {}, [
-                el('div', { class: 'matching-rule-title' }, '3. Цена — подтверждение'),
-                el('div', { class: 'text-secondary' }, 'Одинаковая цена усиливает совпадение адреса. Одна только цена никогда не объединяет записи.')
-            ])
-        ]),
-        el('div', { class: 'matching-note' }, 'Технические ID источников не используются как признак объекта и не показываются. Каждый объединённый объект имеет только порядковый номер.')
-    ]));
-
     let activeFilter = 'all';
     const card = el('div', { class: 'card card-pad' });
     const chips = el('div', { class: 'table-toolbar' }, [

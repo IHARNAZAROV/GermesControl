@@ -19,7 +19,8 @@ function sourceCard(key, onChanged) {
         ? el('span', { class: `badge ${info.isDemo ? 'badge-warning' : 'badge-success'}` }, info.isDemo ? 'Демо-данные' : '\u2713 Загружено')
         : el('span', { class: 'badge badge-danger' }, 'Нет данных');
 
-    card.appendChild(el('div', { class: 'imp-title' }, `${meta.label} (${meta.format})`));
+    const title = key === 'kufar' ? meta.label : `${meta.label} (${meta.format})`;
+    card.appendChild(el('div', { class: 'imp-title' }, title));
     card.appendChild(el('div', { class: 'imp-file' }, info.fileName || 'Файл не загружен'));
     card.appendChild(el('div', { class: 'imp-count' }, `${info.count || 0} объектов`));
     card.appendChild(status);
