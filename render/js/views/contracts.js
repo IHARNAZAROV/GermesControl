@@ -35,7 +35,8 @@ function contractSeparator(value) {
 }
 
 function hasContractFormatMismatch(contract) {
-    return new Set(contractSeparators(contract)).size > 1;
+    const separators = contractSeparators(contract).map(({ separator }) => separator);
+    return new Set(separators).size > 1;
 }
 
 function contractSeparators(contract) {
