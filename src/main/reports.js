@@ -21,7 +21,7 @@ function buildRows(reportType, report) {
             return objects
                 .filter((o) => o.status === 'missing')
                 .map((o) => ({
-                    ID: o.id,
+                    'ID группы': o.id,
                     Объект: o.title || '',
                     Сайт: o.presence.site ? 'есть' : 'нет',
                     ILVO: o.presence.ilvo ? 'есть' : 'нет',
@@ -31,7 +31,7 @@ function buildRows(reportType, report) {
             return contracts.map((c) => ({
                 'Номер договора': c.number || '',
                 Дата: c.date || '',
-                'ID объекта': c.objectId || '—'
+                'ID группы': c.objectId || '—'
             }));
         case 'errors':
             return errors.map((e) => ({
@@ -48,7 +48,7 @@ function buildRows(reportType, report) {
                 .filter((o) => o.fieldDiffs && o.fieldDiffs.length)
                 .flatMap((o) =>
                     o.fieldDiffs.map((d) => ({
-                        ID: o.id,
+                        'ID группы': o.id,
                         Поле: d.label,
                         Сайт: d.values.site ?? '',
                         ILVO: d.values.ilvo ?? '',
@@ -58,7 +58,7 @@ function buildRows(reportType, report) {
         case 'full':
         default:
             return objects.map((o) => ({
-                ID: o.id,
+                'ID группы': o.id,
                 Объект: o.title || '',
                 Тип: o.type || '',
                 Город: o.city || '',

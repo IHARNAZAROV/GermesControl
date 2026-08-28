@@ -72,6 +72,10 @@ function buildBaseObject(rng, idNum) {
 
 function cloneFor(source, obj) {
     const copy = { ...obj };
+    // В реальных выгрузках каждый источник выдаёт собственный технический
+    // ID. Демо-данные должны отражать это, иначе невозможно проверить, что
+    // объединение действительно работает без опоры на ID.
+    copy.id = `${source}-${obj.id}`;
     if (source === 'kufar') {
         // Kufar получает данные через рекламную XML-выгрузку - минимум полей.
         delete copy.description;
@@ -167,7 +171,9 @@ function buildSampleDataset() {
         contracts.push({
             number: entry.contractNumber,
             date: dateOffset(Math.floor(rng() * 240)),
-            objectId: entry.objectId
+            // Реестр договоров в демо связывается с ID сайта; движок
+            // сопоставления преобразует его во внутренний ID группы.
+            objectId: `site-${entry.objectId}`
         });
     });
 

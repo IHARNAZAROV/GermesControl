@@ -15,7 +15,7 @@
   "dependencies": {
     "dayjs": "^1.11.23",
     "electron-store": "^8.2.0",
-    "fast-xml-parser": "^5.11.0",
+    "fast-xml-parser": "^5.11.1",
     "fs-extra": "^11.4.0",
     "pdfkit": "^0.20.1",
     "xlsx": "^0.18.5"

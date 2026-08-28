@@ -66,9 +66,63 @@ function recordContractKey(record) {
     ));
 }
 
+function normalizedComparableText(value) {
+    return String(value || '')
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/ё/g, 'е')
+        .replace(/[^0-9a-zа-я]+/giu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 function recordAddressKey(record) {
     if (!record) return null;
     return normalizeAddressKey(record.city, record.address) || record.addressKey || null;
+}
+
+function recordPrice(record) {
+    if (!record) return null;
+    const price = Number(record.price);
+    if (Number.isFinite(price) && price > 0) return { value: price, currency: 'BYN' };
+    const priceUsd = Number(record.priceUsd);
+    if (Number.isFinite(priceUsd) && priceUsd > 0) return { value: priceUsd, currency: 'USD' };
+    return null;
+}
+
+function pricesMatch(a, b) {
+    const priceA = recordPrice(a);
+    const priceB = recordPrice(b);
+    if (!priceA || !priceB || priceA.currency !== priceB.currency) return false;
+    const tolerance = Math.max(1, Math.max(priceA.value, priceB.value) * 0.01);
+    return Math.abs(priceA.value - priceB.value) <= tolerance;
+}
+
+function numericValuesMatch(a, b, tolerance = 0.01) {
+    if (a === null || a === undefined || b === null || b === undefined) return false;
+    const na = Number(a);
+    const nb = Number(b);
+    if (!Number.isFinite(na) || !Number.isFinite(nb)) return false;
+    return Math.abs(na - nb) <= Math.max(0.5, Math.max(Math.abs(na), Math.abs(nb)) * tolerance);
+}
+
+/**
+ * В некоторых выгрузках нет договора и отдельного адреса, но остаются
+ * цена и базовые характеристики из колонки «Объект»/«Описание». Это
+ * достаточно только как консервативный третий вариант: цена должна
+ * совпасть вместе минимум с двумя характеристиками, а не сама по себе.
+ */
+function descriptorMatches(a, b) {
+    if (!pricesMatch(a, b)) return false;
+    const propertyChecks = [
+        normalizedComparableText(a.type) && normalizedComparableText(a.type) === normalizedComparableText(b.type),
+        numericValuesMatch(a.rooms, b.rooms, 0),
+        numericValuesMatch(a.totalArea, b.totalArea, 0.01)
+    ].filter(Boolean);
+    // Город может быть районом в одном источнике и населённым пунктом в
+    // другом, а тип сделки не идентифицирует саму недвижимость. Поэтому
+    // они не считаются сильными признаками для объединения.
+    return propertyChecks.length >= 2;
 }
 
 function addressMatches(a, b) {
@@ -104,24 +158,50 @@ function buildMatchGroups(bySource) {
 
     function findMatch(group, rec) {
         const recContractKey = recordContractKey(rec);
-        let contractMatch = false;
-        let addressMatch = false;
+        let best = null;
 
         for (const existing of Object.values(group.records)) {
             if (!existing) continue;
             const existingContractKey = recordContractKey(existing);
-            if (recContractKey && existingContractKey && recContractKey === existingContractKey) {
-                contractMatch = true;
-            }
-            if (addressMatches(rec, existing)) addressMatch = true;
+            const contractMatch = !!(recContractKey && existingContractKey && recContractKey === existingContractKey);
+            const addressMatch = addressMatches(rec, existing);
+            const priceMatch = pricesMatch(rec, existing);
+            const descriptorMatch = !contractMatch && !addressMatch && descriptorMatches(rec, existing);
+
+            // Одинаковый договор объединяет записи даже при расхождении
+            // адреса/цены: эти расхождения должны попасть внутрь одной
+            // карточки и быть показаны пользователю как проблема.
+            if (!contractMatch && !addressMatch && !descriptorMatch) continue;
+
+            const candidate = {
+                contractMatch,
+                addressMatch,
+                priceMatch,
+                descriptorMatch,
+                score: (contractMatch ? 1000 : 0)
+                    + (addressMatch ? 300 : 0)
+                    + (descriptorMatch ? 180 : 0)
+                    + (priceMatch ? 80 : 0)
+            };
+            if (!best || candidate.score > best.score) best = candidate;
         }
 
-        if (!contractMatch && !addressMatch) return null;
-        return {
-            contractMatch,
-            addressMatch,
-            score: (contractMatch ? 100 : 0) + (addressMatch ? 30 : 0)
-        };
+        return best;
+    }
+
+    function addMatchEvidence(group, match) {
+        if (match.contractMatch) group.evidence.add('contract');
+        if (match.addressMatch) group.evidence.add('address');
+        if (match.priceMatch) group.evidence.add('price');
+        if (match.descriptorMatch) group.evidence.add('descriptor');
+    }
+
+    function groupBasis(group) {
+        if (group.evidence.has('contract')) return 'contract';
+        if (group.evidence.has('address') && group.evidence.has('price')) return 'address_price';
+        if (group.evidence.has('address')) return 'address';
+        if (group.evidence.has('descriptor')) return 'descriptor';
+        return 'none';
     }
 
     for (const src of SRC_ORDER) {
@@ -135,17 +215,20 @@ function buildMatchGroups(bySource) {
             if (candidates[0]) {
                 const { group, match } = candidates[0];
                 group.records[src] = rec;
-                // Не теряем информацию о том, что группа была связана
-                // по адресу: это важно для последующей ошибки договора.
-                if (match.contractMatch) group.matchedBy = 'contract';
+                addMatchEvidence(group, match);
+                group.matchedBy = groupBasis(group);
                 continue;
             }
 
-            groups.push({
+            const group = {
                 key: `group-${groupSeq++}`,
-                matchedBy: recordContractKey(rec) ? 'contract' : (recordAddressKey(rec) ? 'address' : 'none'),
+                // У одиночной записи ещё нет основания объединения. Оно
+                // появится только после присоединения записи другого источника.
+                matchedBy: 'none',
+                evidence: new Set(),
                 records: { [src]: rec }
-            });
+            };
+            groups.push(group);
         }
     }
 
@@ -197,7 +280,15 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
         const presence = { site: !!s, ilvo: !!i, kufar: !!k };
         const primary = s || i || k;
         const id = `MATCH-${String(objSeq++).padStart(4, '0')}`;
-        const target = (s && s.id) || (i && i.id) || (k && k.id) || id;
+        // Исходные ID принадлежат конкретной системе и не являются ID
+        // недвижимости. Для объединённой карточки используем собственный
+        // стабильный в рамках отчёта ID, а исходные значения сохраняем ниже.
+        const target = id;
+        const sourceIds = {
+            site: s && s.id ? s.id : null,
+            ilvo: i && i.id ? i.id : null,
+            kufar: k && k.id ? k.id : null
+        };
         for (const record of [s, i, k]) {
             if (record && record.id) objectIdAliases.set(record.id, target);
         }
@@ -264,6 +355,9 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
             title: merged.title || [primary.type, primary.address].filter(Boolean).join(', '),
             presence,
             matchedBy: group.matchedBy,
+            matchConfidence: group.matchedBy === 'contract' || group.matchedBy === 'address_price' ? 'strong' : (group.matchedBy === 'none' ? 'none' : 'review'),
+            sourceIds,
+            sourceIdsText: Object.entries(sourceIds).filter(([, sourceId]) => sourceId).map(([source, sourceId]) => `${source}: ${sourceId}`).join(' '),
             fieldDiffs,
             contractNumber,
             status
@@ -287,12 +381,18 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
 
     const normalizedContracts = (contracts || []).map((contract) => {
         const key = recordContractKey(contract) || contract.key || null;
-        let objectId = contract.objectId ? (objectIdAliases.get(contract.objectId) || contract.objectId) : null;
+        let objectId = contract.objectId
+            ? (objectIdAliases.get(contract.objectId) || (objectIds.has(contract.objectId) ? contract.objectId : null))
+            : null;
         // Если импортированный реестр не содержит ID объекта, но договор
         // однозначно найден среди объединённых объектов, связываем запись
-        // с ним и не создаём вторую строку в таблице.
+        // с ним и не создаём вторую строку в таблице. Это также покрывает
+        // случай, когда договор ссылается на отсутствующую карточку сайта,
+        // но его номер есть в ILVO или Kufar.
         const derivedObjectIds = key ? derivedObjectsByContract.get(key) || [] : [];
-        if (!objectId && derivedObjectIds.length === 1) objectId = derivedObjectIds[0];
+        if ((!objectId || !objectIds.has(objectId)) && derivedObjectIds.length === 1) {
+            objectId = derivedObjectIds[0];
+        }
         return { ...contract, number: key || contract.number, key, objectId };
     });
 

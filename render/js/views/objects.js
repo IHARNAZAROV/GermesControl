@@ -13,9 +13,24 @@ function statusBadge(status) {
     return el('span', { class: 'badge badge-warning' }, '\u26A0 расхождение');
 }
 
+function matchBasis(obj) {
+    const labels = {
+        contract: 'По договору',
+        address_price: 'Адрес + цена',
+        address: 'По адресу',
+        descriptor: 'Цена + параметры',
+        none: 'Без совпадения'
+    };
+    const label = labels[obj.matchedBy] || labels.none;
+    const className = obj.matchConfidence === 'strong'
+        ? 'badge-success'
+        : (obj.matchConfidence === 'review' ? 'badge-warning' : 'badge-danger');
+    return el('span', { class: `badge ${className}`, title: 'Правило, по которому записи объединены' }, label);
+}
+
 function showObjectDetail(obj) {
     const rows = [
-        ['ID', obj.id],
+        ['ID объединённой карточки', obj.id],
         ['Название', obj.title],
         ['Тип', obj.type],
         ['Тип сделки', obj.dealType],
@@ -32,12 +47,29 @@ function showObjectDetail(obj) {
     ];
 
     const body = [
+        el('div', { class: 'matching-explanation' }, [
+            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-bottom:4px;' }, 'Основание объединения'),
+            matchBasis(obj),
+            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-top:8px;' }, 'Исходные ID не сравниваются: каждая система выдаёт свой ID для той же недвижимости.')
+        ]),
         el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-bottom:16px;' },
             rows.map(([label, value]) => el('div', {}, [
                 el('div', { class: 'text-secondary', style: 'font-size:11.5px;' }, label),
                 el('div', { style: 'font-weight:600;font-size:13px;' }, String(value ?? '—'))
             ]))
         ),
+        el('div', { style: 'margin-bottom:16px;' }, [
+            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-bottom:6px;' }, 'ID в источниках'),
+            ...[
+                ['Сайт', obj.presence.site, obj.sourceIds && obj.sourceIds.site],
+                ['ILVO', obj.presence.ilvo, obj.sourceIds && obj.sourceIds.ilvo],
+                ['Kufar', obj.presence.kufar, obj.sourceIds && obj.sourceIds.kufar]
+            ].map(([label, present, sourceId]) => el('div', { style: 'font-size:12px;margin-top:4px;' }, [
+                presenceChip(present, label),
+                el('span', { style: 'margin-left:7px;font-weight:600;' }, label),
+                el('span', { class: 'text-secondary', style: 'margin-left:6px;' }, sourceId || 'нет записи')
+            ]))
+        ]),
         el('div', { style: 'display:flex;gap:8px;margin-bottom:16px;' }, [
             presenceChip(obj.presence.site, 'Сайт'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'Сайт'),
             presenceChip(obj.presence.ilvo, 'ILVO'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'ILVO'),
@@ -61,19 +93,38 @@ function showObjectDetail(obj) {
         });
     }
 
-    openModal({ title: obj.id, body, width: '560px' });
+    openModal({ title: obj.title || obj.id, body, width: '560px' });
 }
 
 export function renderObjects(container) {
     container.innerHTML = '';
     container.appendChild(el('div', { class: 'page-title' }, 'Объекты'));
-    container.appendChild(el('div', { class: 'page-subtitle' }, 'Полный реестр объектов недвижимости по всем источникам'));
+    container.appendChild(el('div', { class: 'page-subtitle' }, 'Единый реестр объектов недвижимости по всем источникам'));
 
     const report = store.report;
     if (!report) {
         container.appendChild(el('div', { class: 'card card-pad table-empty' }, 'Запустите проверку на главной странице, чтобы увидеть объекты'));
         return;
     }
+
+    container.appendChild(el('div', { class: 'card card-pad matching-rules' }, [
+        el('div', { class: 'card-title' }, 'Как система объединяет записи'),
+        el('div', { class: 'matching-rules-grid' }, [
+            el('div', {}, [
+                el('div', { class: 'matching-rule-title' }, '1. Договор — главный ключ'),
+                el('div', { class: 'text-secondary' }, '«41/1», «Договор 41/1» и «Договор 41/1 от 01.07.2026» считаются одним номером.')
+            ]),
+            el('div', {}, [
+                el('div', { class: 'matching-rule-title' }, '2. Адрес — резервный ключ'),
+                el('div', { class: 'text-secondary' }, 'Улица и номер дома сравниваются после очистки сокращений, регистра и лишних пробелов.')
+            ]),
+            el('div', {}, [
+                el('div', { class: 'matching-rule-title' }, '3. Цена — подтверждение'),
+                el('div', { class: 'text-secondary' }, 'Одинаковая цена усиливает совпадение адреса. Одна только цена никогда не объединяет записи.')
+            ])
+        ]),
+        el('div', { class: 'matching-note' }, 'ID в источниках разные и не используются как признак объекта. В таблице показывается внутренний ID объединённой карточки MATCH-…; исходные ID доступны внутри карточки.')
+    ]));
 
     let activeFilter = 'all';
     const card = el('div', { class: 'card card-pad' });
@@ -102,13 +153,14 @@ export function renderObjects(container) {
         tableHolder.innerHTML = '';
         tableHolder.appendChild(renderDataTable({
             columns: [
-                { key: 'id', label: 'ID' },
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
+                { key: 'id', label: 'ID группы' },
                 { key: 'type', label: 'Тип', render: (o) => o.type || '—' },
                 { key: 'city', label: 'Город', render: (o) => o.city || '—' },
                 { key: 'price', label: 'Цена', render: (o) => formatMoney(o.price, 'BYN') },
                 { key: 'totalArea', label: 'Площадь', render: (o) => formatMoney(o.totalArea, 'м²') },
                 { key: 'contractNumber', label: 'Договор', render: (o) => o.contractNumber || '—' },
+                { key: 'matchedBy', label: 'Объединено', render: (o) => matchBasis(o) },
                 { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => presenceChip(o.presence.site) },
                 { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => presenceChip(o.presence.ilvo) },
                 { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => presenceChip(o.presence.kufar) },
@@ -116,7 +168,7 @@ export function renderObjects(container) {
                 { key: 'actions', label: '', render: (o) => el('span', { class: 'btn btn-ghost btn-sm', onclick: () => showObjectDetail(o) }, 'Открыть') }
             ],
             rows,
-            searchFields: ['id', 'title', 'city', 'address', 'contractNumber'],
+            searchFields: ['id', 'title', 'city', 'address', 'contractNumber', 'sourceIdsText'],
             emptyText: 'Объекты не найдены'
         }));
     }

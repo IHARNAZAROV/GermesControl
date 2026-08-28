@@ -50,6 +50,18 @@ matching.
 `cleanLocationText`, test both Cyrillic and Latin variants instead of relying
 on `\b` around Cyrillic text.
 
+## Price as supporting evidence
+Price is a corroborating signal, not a standalone identity key. Use it to
+strengthen and disambiguate an address match; without a contract or address,
+require at least two strong property attributes alongside the price.
+
+**Why:** the same price can occur for unrelated listings, while legitimate
+cross-source listings can differ slightly in price and must still be grouped
+so the price discrepancy is reported inside one object.
+
+**How to apply:** keep price-only pairs separate; allow address matches with
+different prices so price mismatches remain visible to the comparison report.
+
 ## Kufar feed schema
 The real static Kufar feed (URL is the `kufarXmlUrl` default in
 dataStore.js) is `<uedb><records><record>...</record></records></uedb>`,

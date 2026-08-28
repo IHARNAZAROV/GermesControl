@@ -79,7 +79,7 @@ export function renderContracts(container) {
                 { key: 'number', label: '№ договора' },
                 { key: 'date', label: 'Дата' },
                 { key: 'objTitle', label: 'Объект', render: (c) => (c.obj ? c.obj.title : '—') },
-                { key: 'objectId', label: 'ID объекта', render: (c) => c.objectId || '—' },
+                { key: 'objectId', label: 'ID группы', render: (c) => c.objectId || '—' },
                 { key: 'status', label: 'Статус', render: (c) => c.problem ? el('span', { class: 'badge badge-danger' }, c.problem) : el('span', { class: 'badge badge-success' }, '\u2713 ок') },
                 { key: 'problem', label: 'Проблема', render: (c) => c.problem || '—' }
             ],
