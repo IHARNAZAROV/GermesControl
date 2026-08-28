@@ -34,7 +34,7 @@
 .source-ilvo .source-icon { background: #EEF1FF; }
 .source-kufar .source-icon { background: var(--color-warning-bg); }
 .source-logo { display: block; width: 100%; height: 100%; object-fit: cover; }
-.source-logo-site { object-position: center; }
+.source-logo-site { object-fit: contain; object-position: center; }
 .source-logo-ilvo { object-position: center; }
 .source-logo-kufar { object-position: center; }
 
