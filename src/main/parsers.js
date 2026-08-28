@@ -3,7 +3,7 @@
 const fs = require('fs-extra');
 const XLSX = require('xlsx');
 const { XMLParser } = require('fast-xml-parser');
-const { OBJECT_FIELDS, extractContractKey, normalizeAddressKey } = require('./schema');
+const { OBJECT_FIELDS, extractContractKey, extractContractDate, normalizeAddressKey } = require('./schema');
 
 const NUMERIC_KEYS = new Set(OBJECT_FIELDS.filter((f) => f.numeric).map((f) => f.key));
 
@@ -37,6 +37,7 @@ function finalizeRecord(rec, source, syntheticId) {
     out.id = out.id || syntheticId;
     out.source = source;
     out.contractKey = extractContractKey(out.contractNumber);
+    out.contractDate = extractContractDate(rec.contractDate) || extractContractDate(out.contractNumber);
     out.addressKey = normalizeAddressKey(out.city, out.address);
     return out;
 }
@@ -52,7 +53,9 @@ async function parseSiteJson(filePath) {
     const raw = await fs.readJson(filePath);
     const list = Array.isArray(raw) ? raw : (Array.isArray(raw.objects) ? raw.objects : []);
     return list
-        .map((o, idx) => finalizeRecord({
+        .map((o, idx) => {
+            const contractNumber = o.contractNumber || null;
+            return finalizeRecord({
             id: o.id || o.slug || null,
             title: o.title || null,
             type: o.type || null,
@@ -68,9 +71,11 @@ async function parseSiteJson(filePath) {
             floor: o.floor ?? null,
             floors: o.floorsTotal ?? o.floors ?? null,
             description: o.description || o.cardDescription || null,
-            contractNumber: o.contractNumber || null,
+            contractNumber,
+            contractDate: extractContractDate(contractNumber),
             status: (o.status && typeof o.status === 'object') ? (o.status.type || 'active') : (o.status || 'active')
-        }, 'site', `site-${idx + 1}`))
+            }, 'site', `site-${idx + 1}`);
+        })
         .filter((r) => r.title || r.address);
 }
 
@@ -182,6 +187,7 @@ async function parseIlvoXlsx(filePath) {
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: null });
         for (const row of rows) {
             const desc = cleanString(row['Описание']);
+            const contractNumber = row['Договор'] ?? null;
             const rec = finalizeRecord({
                 id: null,
                 title: null,
@@ -198,7 +204,8 @@ async function parseIlvoXlsx(filePath) {
                 floor: extractFloorFromText(desc),
                 floors: extractFloorsFromText(desc),
                 description: desc,
-                contractNumber: row['Договор'] || null,
+                contractNumber,
+                contractDate: extractContractDate(contractNumber) || extractContractDate(desc),
                 status: 'active'
             }, 'ilvo', `ilvo-${rowSeq}`);
             if (!rec.title) {

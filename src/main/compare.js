@@ -6,12 +6,13 @@ const {
     ERROR_TYPES,
     ERROR_SEVERITY,
     extractContractKey,
+    extractContractDate,
     normalizeAddressKey,
     cleanLocationText
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 3;
+const REPORT_MATCHING_VERSION = 4;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -350,7 +351,7 @@ const MISMATCH_TYPE_BY_FIELD = {
  * реестр договоров, возвращает единый отчёт: presence-матрицу,
  * расхождения полей, список ошибок и агрегированную статистику.
  */
-function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
+function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry = true }, previousSnapshot) {
     const sources = {
         site: collapseSourceDuplicates(site),
         ilvo: collapseSourceDuplicates(ilvo),
@@ -477,7 +478,17 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
     // заданные записи, включая «сиротские» договоры без объекта.
     const derivedContracts = objects
         .filter((o) => o.contractNumber)
-        .map((o) => ({ number: o.contractNumber, key: o.contractNumber, date: null, objectId: o.id }));
+        .map((o) => {
+            const sourceRecords = [
+                sources.site.find((record) => recordContractKey(record) === o.contractNumber),
+                sources.ilvo.find((record) => recordContractKey(record) === o.contractNumber),
+                sources.kufar.find((record) => recordContractKey(record) === o.contractNumber)
+            ].filter(Boolean);
+            const date = sourceRecords
+                .map((record) => record.contractDate || extractContractDate(record.contractNumber))
+                .find(Boolean) || null;
+            return { number: o.contractNumber, key: o.contractNumber, date, objectId: o.id };
+        });
 
     const derivedObjectsByContract = new Map();
     for (const contract of derivedContracts) {
@@ -485,7 +496,7 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
         derivedObjectsByContract.get(contract.key).push(contract.objectId);
     }
 
-    const normalizedContracts = (contracts || []).map((contract) => {
+    const normalizedContracts = (includeContractRegistry ? contracts : []).map((contract) => {
         const key = recordContractKey(contract) || contract.key || null;
         let objectId = contract.objectId
             ? (objectIdAliases.get(contract.objectId) || (objectIds.has(contract.objectId) ? contract.objectId : null))
@@ -583,6 +594,7 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
 
     return {
         matchingVersion: REPORT_MATCHING_VERSION,
+        contractRegistrySource: includeContractRegistry ? 'demo' : 'objects',
         checkedAt: new Date().toISOString(),
         objects,
         errors,

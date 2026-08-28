@@ -98,3 +98,17 @@ straight from `<re_contract>` (reliable). Explicit `<address>` tags are rare
 (~1 in 48 records); location is otherwise only guessable from `<subject>`
 (never from `<body>`, which always ends in the agency's own boilerplate
 office address that would otherwise get misread as the listing's address).
+
+## Demo data must not leak into imports
+The initial demo state includes a synthetic contract registry so the contract
+checks have examples immediately. A real source import must clear demo sources,
+the demo registry, and any saved report before the next check; real reports
+derive contracts from the current source records instead.
+
+**Why:** the demo generator intentionally creates hundreds of numbered
+contracts, which can look like real agency data when a user imports only one
+source and the old demo state remains alongside it.
+
+**How to apply:** preserve the demo registry only when all three source
+metadata records are explicitly marked as demo; never merge it into a report
+for real imported data.

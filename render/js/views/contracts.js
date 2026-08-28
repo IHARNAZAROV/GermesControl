@@ -1,4 +1,4 @@
-import { el } from '../format.js';
+import { el, formatShortDate } from '../format.js';
 import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
 
@@ -43,6 +43,14 @@ export function renderContracts(container) {
     const card = el('div', { class: 'card card-pad' }, [chips, tableHolder]);
     container.appendChild(card);
 
+    if (report.contractRegistrySource === 'demo') {
+        container.appendChild(el('div', { class: 'card card-pad', style: 'margin-top:16px;' }, [
+            el('div', { class: 'card-title' }, 'Демонстрационный реестр'),
+            el('p', { class: 'card-subtitle', style: 'margin-top:8px;' },
+                'Эти номера созданы для демо-режима. После импорта реального файла они заменяются договорами, найденными в текущих объектах.')
+        ]));
+    }
+
     if (objectsWithoutContract.length) {
         container.appendChild(el('div', { class: 'card card-pad', style: 'margin-top:16px;' }, [
             el('div', { class: 'card-title' }, `Объекты без договора (${objectsWithoutContract.length})`),
@@ -77,7 +85,7 @@ export function renderContracts(container) {
         tableHolder.appendChild(renderDataTable({
             columns: [
                 { key: 'number', label: '№ договора' },
-                { key: 'date', label: 'Дата' },
+                { key: 'date', label: 'Дата', render: (c) => formatShortDate(c.date) },
                 { key: 'objTitle', label: 'Объект', render: (c) => (c.obj ? c.obj.title : '—') },
                 { key: 'objectNumber', label: '№ объекта', render: (c) => c.obj ? c.obj.objectNumber : '—' },
                 { key: 'status', label: 'Статус', render: (c) => c.problem ? el('span', { class: 'badge badge-danger' }, c.problem) : el('span', { class: 'badge badge-success' }, '\u2713 ок') },

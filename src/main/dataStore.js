@@ -70,6 +70,18 @@ function saveState(state) {
 
 function setSourceData(sourceKey, records, meta) {
     const state = getState();
+    const isRealImport = meta && meta.isDemo === false;
+    if (isRealImport) {
+        // Демо-источники нельзя смешивать с первым реальным импортом:
+        // иначе старые синтетические договоры и объекты остаются в отчёте.
+        for (const otherSource of ['site', 'ilvo', 'kufar']) {
+            if (otherSource !== sourceKey && state.sources[otherSource]?.meta?.isDemo === true) {
+                state.sources[otherSource] = { data: [], meta: defaultMeta() };
+            }
+        }
+        state.contracts = [];
+        fs.removeSync(REPORT_FILE);
+    }
     state.sources[sourceKey] = { data: records, meta: { ...defaultMeta(), ...meta, count: records.length, importedAt: new Date().toISOString() } };
     saveState(state);
     return state;

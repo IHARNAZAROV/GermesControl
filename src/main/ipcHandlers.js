@@ -75,7 +75,15 @@ function registerIpcHandlers(getMainWindow) {
         const site = (state.sources.site && state.sources.site.data) || [];
         const ilvo = (state.sources.ilvo && state.sources.ilvo.data) || [];
         const kufar = (state.sources.kufar && state.sources.kufar.data) || [];
-        const report = runComparison({ site, ilvo, kufar, contracts: state.contracts || [] }, previous);
+        const sourceKeys = ['site', 'ilvo', 'kufar'];
+        const allSourcesAreDemo = sourceKeys.every((sourceKey) => state.sources[sourceKey]?.meta?.isDemo === true);
+        const report = runComparison({
+            site,
+            ilvo,
+            kufar,
+            contracts: state.contracts || [],
+            includeContractRegistry: allSourcesAreDemo
+        }, previous);
         store.saveLastReport(report);
         store.appendHistory({
             checkedAt: report.checkedAt,

@@ -96,6 +96,30 @@ function extractContractKey(raw) {
     return simpleMatch ? simpleMatch[0].toUpperCase() : null;
 }
 
+/**
+ * Извлекает дату договора из строки номера:
+ * «Договор №1/1 от 01.07.2026» -> «2026-07-01».
+ * В реальных выгрузках ILVO дата может находиться в описании, поэтому
+ * функция принимает любой текст и ищет именно дату после слова «от».
+ */
+function extractContractDate(raw) {
+    if (raw === undefined || raw === null) return null;
+    const text = String(raw).replace(/\u00a0/g, ' ').trim();
+    if (!text) return null;
+
+    const isoMatch = text.match(/^(?:.*\s)?(\d{4})-(\d{1,2})-(\d{1,2})(?:$|\s)/u);
+    if (isoMatch) {
+        const [, year, month, day] = isoMatch;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    const dateMatch = text.match(/(?:^|[\s,;:])от\s*(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/iu);
+    if (!dateMatch) return null;
+    const [, day, month, rawYear] = dateMatch;
+    const year = rawYear.length === 2 ? `20${rawYear}` : rawYear;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
 const ADDRESS_STOPWORDS = /(?<![0-9A-Za-zА-Яа-яЁё])(ул|улица|пр|проспект|пер|переулок|б-р|бульвар|бр|д|дом|г|город|пос|посёлок|поселок|ст|аг|агрогородок)(?![0-9A-Za-zА-Яа-яЁё])\.?/giu;
 
 /**
@@ -123,4 +147,14 @@ function normalizeAddressKey(city, address) {
     return a || null;
 }
 
-module.exports = { OBJECT_FIELDS, SOURCES, ERROR_TYPES, SEVERITY, ERROR_SEVERITY, extractContractKey, normalizeAddressKey, cleanLocationText };
+module.exports = {
+    OBJECT_FIELDS,
+    SOURCES,
+    ERROR_TYPES,
+    SEVERITY,
+    ERROR_SEVERITY,
+    extractContractKey,
+    extractContractDate,
+    normalizeAddressKey,
+    cleanLocationText
+};
