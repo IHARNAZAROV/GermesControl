@@ -172,6 +172,7 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
 
     const objects = [];
     const errors = [];
+    const objectIdAliases = new Map();
     const now = dayjs().format('DD.MM.YYYY');
     let errorSeq = 1;
     let objSeq = 1;
@@ -197,6 +198,9 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
         const primary = s || i || k;
         const id = `MATCH-${String(objSeq++).padStart(4, '0')}`;
         const target = (s && s.id) || (i && i.id) || (k && k.id) || id;
+        for (const record of [s, i, k]) {
+            if (record && record.id) objectIdAliases.set(record.id, target);
+        }
 
         const fieldDiffs = [];
         const pairs = [
@@ -274,11 +278,43 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
     const derivedContracts = objects
         .filter((o) => o.contractNumber)
         .map((o) => ({ number: o.contractNumber, key: o.contractNumber, date: null, objectId: o.id }));
+
+    const derivedObjectsByContract = new Map();
+    for (const contract of derivedContracts) {
+        if (!derivedObjectsByContract.has(contract.key)) derivedObjectsByContract.set(contract.key, []);
+        derivedObjectsByContract.get(contract.key).push(contract.objectId);
+    }
+
     const normalizedContracts = (contracts || []).map((contract) => {
         const key = recordContractKey(contract) || contract.key || null;
-        return { ...contract, number: key || contract.number, key };
+        let objectId = contract.objectId ? (objectIdAliases.get(contract.objectId) || contract.objectId) : null;
+        // Если импортированный реестр не содержит ID объекта, но договор
+        // однозначно найден среди объединённых объектов, связываем запись
+        // с ним и не создаём вторую строку в таблице.
+        const derivedObjectIds = key ? derivedObjectsByContract.get(key) || [] : [];
+        if (!objectId && derivedObjectIds.length === 1) objectId = derivedObjectIds[0];
+        return { ...contract, number: key || contract.number, key, objectId };
     });
-    const allContracts = [...derivedContracts, ...normalizedContracts];
+
+    const allContracts = [];
+    const contractsByIdentity = new Map();
+    function addContract(contract, index) {
+        const key = contract.key || recordContractKey(contract) || contract.number;
+        if (!key) return;
+        const identity = `${key}::${contract.objectId || `orphan-${index}`}`;
+        const existing = contractsByIdentity.get(identity);
+        if (!existing) {
+            contractsByIdentity.set(identity, contract);
+            allContracts.push(contract);
+            return;
+        }
+        // Сохраняем более полную запись реестра (дату), но не допускаем
+        // повторной строки для того же нормализованного договора и объекта.
+        if (!existing.date && contract.date) existing.date = contract.date;
+        if (!existing.objectId && contract.objectId) existing.objectId = contract.objectId;
+    }
+
+    [...derivedContracts, ...normalizedContracts].forEach(addContract);
 
     // Проверки договоров.
     const contractByKey = new Map();
