@@ -12,7 +12,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 4;
+const REPORT_MATCHING_VERSION = 5;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -66,6 +66,27 @@ function recordContractKey(record) {
         ?? record.contractKey
         ?? record.key
     ));
+}
+
+function recordContractNumber(record) {
+    if (!record) return null;
+    const value = record.contractNumber ?? record.number ?? record.contractKey ?? record.key;
+    return hasRecordValue(value) ? String(value).trim() : null;
+}
+
+function contractSourceLabel(records) {
+    return Object.entries(records)
+        .filter(([, value]) => hasRecordValue(value))
+        .map(([source]) => source === 'site' ? 'Сайт' : source === 'ilvo' ? 'ILVO' : 'Kufar')
+        .join(' / ');
+}
+
+function contractPresentationKey(value) {
+    return String(value || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLocaleLowerCase('ru-RU');
 }
 
 function normalizedComparableText(value) {
@@ -431,7 +452,33 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         const contractValues = [s, i, k].filter(Boolean).map(recordContractKey).filter(Boolean);
         const uniqueContracts = new Set(contractValues);
         if (uniqueContracts.size > 1) {
-            pushError(ERROR_TYPES.CONTRACT_MISMATCH, 'Номер договора отличается между источниками', target, 'Сайт / ILVO');
+            pushError(
+                ERROR_TYPES.CONTRACT_MISMATCH,
+                'Номер договора отличается между источниками',
+                target,
+                contractSourceLabel({ site: recordContractNumber(s), ilvo: recordContractNumber(i), kufar: recordContractNumber(k) })
+            );
+        } else if (uniqueContracts.size === 1) {
+            const contractForms = { site: recordContractNumber(s), ilvo: recordContractNumber(i), kufar: recordContractNumber(k) };
+            const uniqueForms = new Set(Object.values(contractForms).filter(hasRecordValue).map(contractPresentationKey));
+            if (uniqueForms.size > 1) {
+                fieldDiffs.push({
+                    field: 'contractNumber',
+                    label: 'Формат номера договора',
+                    values: {
+                        site: contractForms.site ?? undefined,
+                        ilvo: contractForms.ilvo ?? undefined,
+                        kufar: contractForms.kufar ?? undefined
+                    },
+                    unit: null
+                });
+                pushError(
+                    ERROR_TYPES.CONTRACT_FORMAT_MISMATCH,
+                    `Номер договора ${contractNumber} совпадает по смыслу, но записан в разных форматах`,
+                    target,
+                    contractSourceLabel(contractForms)
+                );
+            }
         }
 
         if (presentSourcesCount > 1) {
@@ -440,9 +487,14 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             if (!presence.kufar) pushError(ERROR_TYPES.MISSING_KUFAR, 'Объект есть в других источниках, но отсутствует в Kufar', target, presence.site ? 'Сайт' : 'ILVO');
         }
 
-        let status = 'ok';
-        if (presentSourcesCount < 3) status = 'missing';
-        if (fieldDiffs.length > 0) status = 'mismatch';
+        const hasMissingSource = presentSourcesCount < 3;
+        let status = hasMissingSource ? 'missing' : 'ok';
+        // Любая ошибка, относящаяся к этой карточке, должна отражаться
+        // в её статусе, а не только расхождения полей из COMPARABLE_FIELDS.
+        const hasObjectErrors = errors.some((error) => (
+            error.targetType === 'object' && error.target === target && error.status === 'open'
+        ));
+        if (!hasMissingSource && (fieldDiffs.length > 0 || hasObjectErrors)) status = 'mismatch';
 
         const merged = {};
         for (const field of OBJECT_FIELDS) {
@@ -456,6 +508,11 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         // В отчёте показываем единый нормализованный номер, а не
         // случайную исходную форму из одного из источников.
         merged.contractNumber = contractNumber;
+        merged.contractForms = {
+            site: recordContractNumber(s),
+            ilvo: recordContractNumber(i),
+            kufar: recordContractNumber(k)
+        };
 
         objects.push({
             ...merged,
@@ -515,9 +572,12 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
 
     const allContracts = [];
     const contractsByKey = new Map();
+    const contractOccurrences = new Map();
     function addContract(contract) {
         const key = contract.key || recordContractKey(contract) || contract.number;
         if (!key) return;
+        if (!contractOccurrences.has(key)) contractOccurrences.set(key, []);
+        contractOccurrences.get(key).push(contract);
         const existing = contractsByKey.get(key);
         if (!existing) {
             contractsByKey.set(key, contract);
@@ -534,23 +594,35 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
     [...derivedContracts, ...normalizedContracts].forEach(addContract);
 
     // Проверки договоров.
-    const contractByKey = new Map();
-    for (const c of allContracts) {
-        const key = recordContractKey(c) || c.key || c.number;
-        if (!key) continue;
-        if (!contractByKey.has(key)) contractByKey.set(key, []);
-        contractByKey.get(key).push(c);
+    for (const [key, occurrences] of contractOccurrences.entries()) {
+        const linkedObjectIds = new Set(occurrences.map((contract) => contract.objectId).filter(Boolean));
+        const orphanOccurrences = occurrences.filter((contract) => !contract.objectId);
+        // Повтор одной и той же строки реестра не является дублем. Дубль —
+        // это один номер у нескольких объектов или несколько бесхозных
+        // записей с одним номером.
+        const isDuplicate = linkedObjectIds.size > 1
+            || (linkedObjectIds.size === 0 && orphanOccurrences.length > 1);
+        const number = occurrences[0].number || key;
+        if (isDuplicate) {
+            pushError(ERROR_TYPES.DUPLICATE_CONTRACT, `Номер договора ${number} используется у нескольких записей`, number, 'Договоры', 'contract');
+        }
+        const hasUnlinkedOccurrence = occurrences.some((c) => !c.objectId || !objectIds.has(c.objectId));
+        if (hasUnlinkedOccurrence) {
+            pushError(ERROR_TYPES.CONTRACT_NO_OBJECT, `Договор ${number} не привязан ни к одному объекту`, number, 'Договоры', 'contract');
+        }
     }
-    for (const [, list] of contractByKey.entries()) {
-        const number = list[0].number;
-        if (list.length > 1) {
-            pushError(ERROR_TYPES.DUPLICATE_CONTRACT, `Номер договора ${number} используется у ${list.length} записей`, number, 'Договоры', 'contract');
-        }
-        for (const c of list) {
-            if (!c.objectId || !objectIds.has(c.objectId)) {
-                pushError(ERROR_TYPES.CONTRACT_NO_OBJECT, `Договор ${number} не привязан ни к одному объекту`, number, 'Договоры', 'contract');
-            }
-        }
+    const duplicateContractKeys = new Set(
+        [...contractOccurrences.entries()]
+            .filter(([key, occurrences]) => {
+                const linkedObjectIds = new Set(occurrences.map((contract) => contract.objectId).filter(Boolean));
+                const orphanOccurrences = occurrences.filter((contract) => !contract.objectId);
+                return linkedObjectIds.size > 1 || (linkedObjectIds.size === 0 && orphanOccurrences.length > 1);
+            })
+            .map(([key]) => key)
+    );
+    for (const contract of allContracts) {
+        const key = contract.key || recordContractKey(contract) || contract.number;
+        if (duplicateContractKeys.has(key)) contract.duplicate = true;
     }
 
     const total = objects.length;

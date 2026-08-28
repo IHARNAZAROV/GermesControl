@@ -2,13 +2,22 @@ import { el } from '../format.js';
 
 /**
  * Универсальная таблица с поиском/сортировкой, управляемая опциями:
- * { columns: [{key, label, render, sortValue}], rows, searchFields, emptyText }
+ * { columns: [{key, label, render, sortValue, compare}], rows, searchFields,
+ *   emptyText, initialSortKey, initialSortDir }
  * Возвращает DOM-узел; фильтрация по searchFields выполняется на строковом представлении.
  */
-export function renderDataTable({ columns, rows, searchFields = [], emptyText = 'Нет данных', pageSize = 50 }) {
+export function renderDataTable({
+    columns,
+    rows,
+    searchFields = [],
+    emptyText = 'Нет данных',
+    pageSize = 50,
+    initialSortKey = null,
+    initialSortDir = 1
+}) {
     let query = '';
-    let sortKey = null;
-    let sortDir = 1;
+    let sortKey = initialSortKey;
+    let sortDir = initialSortDir;
     let page = 0;
 
     const wrap = el('div', {});
@@ -59,6 +68,7 @@ export function renderDataTable({ columns, rows, searchFields = [], emptyText = 
                 if (va === vb) return 0;
                 if (va === null || va === undefined) return 1;
                 if (vb === null || vb === undefined) return -1;
+                if (col.compare) return col.compare(va, vb) * sortDir;
                 return (va > vb ? 1 : -1) * sortDir;
             });
         }

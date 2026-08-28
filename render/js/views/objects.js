@@ -57,7 +57,7 @@ function showObjectDetail(obj) {
         el('div', { class: 'matching-explanation' }, [
             el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-bottom:4px;' }, 'Основание объединения'),
             matchBasis(obj),
-            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-top:8px;' }, 'Записи объединяются по номеру договора и адресу. Технические номера источников не показываются.')
+            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-top:8px;' }, 'Записи объединяются по нормализованному номеру договора и адресу. Исходные номера источников сохраняются для контроля формата.')
         ]),
         el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-bottom:16px;' },
             rows.map(([label, value]) => el('div', {}, [

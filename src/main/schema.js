@@ -42,6 +42,7 @@ const ERROR_TYPES = {
     ADDRESS_MISMATCH: 'Разный адрес',
     ROOMS_MISMATCH: 'Разное количество комнат',
     CONTRACT_MISMATCH: 'Разные данные договора',
+    CONTRACT_FORMAT_MISMATCH: 'Разный формат номера договора',
     OTHER: 'Другие несоответствия'
 };
 
@@ -63,6 +64,7 @@ const ERROR_SEVERITY = {
     [ERROR_TYPES.ADDRESS_MISMATCH]: SEVERITY.INFO,
     [ERROR_TYPES.ROOMS_MISMATCH]: SEVERITY.INFO,
     [ERROR_TYPES.CONTRACT_MISMATCH]: SEVERITY.CRITICAL,
+    [ERROR_TYPES.CONTRACT_FORMAT_MISMATCH]: SEVERITY.INFO,
     [ERROR_TYPES.OTHER]: SEVERITY.INFO
 };
 
