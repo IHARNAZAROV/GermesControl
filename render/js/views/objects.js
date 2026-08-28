@@ -35,6 +35,37 @@ function matchBasis(obj) {
     return el('span', { class: `badge ${className}`, title: 'Правило, по которому записи объединены' }, label);
 }
 
+function renderObjectPhotos(obj) {
+    const photos = Array.isArray(obj.photos) ? obj.photos.filter(Boolean) : [];
+    const gallery = el('div', { class: 'object-photo-gallery' });
+
+    if (!photos.length) {
+        gallery.appendChild(el('div', { class: 'object-photo-empty' }, 'Фотография в загруженных данных не найдена'));
+        return gallery;
+    }
+
+    photos.slice(0, 6).forEach((url, index) => {
+        const frame = el('figure', { class: 'object-photo-frame' });
+        const image = el('img', {
+            src: url,
+            alt: `${obj.title || 'Объект недвижимости'} — фото ${index + 1}`,
+            loading: 'lazy',
+            referrerpolicy: 'no-referrer'
+        });
+        const fallback = el('div', { class: 'object-photo-fallback' }, 'Фото недоступно');
+        fallback.hidden = true;
+        image.addEventListener('error', () => {
+            image.hidden = true;
+            fallback.hidden = false;
+            frame.classList.add('is-unavailable');
+        });
+        frame.append(image, fallback);
+        gallery.appendChild(frame);
+    });
+
+    return gallery;
+}
+
 function showObjectDetail(obj) {
     const rows = [
         ['№ объекта', obj.objectNumber],
@@ -54,6 +85,10 @@ function showObjectDetail(obj) {
     ];
 
     const body = [
+        el('div', { class: 'object-photo-section' }, [
+            el('div', { class: 'card-title' }, 'Фотографии объекта'),
+            renderObjectPhotos(obj)
+        ]),
         el('div', { class: 'matching-explanation' }, [
             el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-bottom:4px;' }, 'Основание объединения'),
             matchBasis(obj),

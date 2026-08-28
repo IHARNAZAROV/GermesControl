@@ -19,6 +19,38 @@ function cleanString(v) {
     return s === '' || s === '-' ? null : s;
 }
 
+function collectPhotoUrls(value, urls = [], photoContext = false) {
+    if (value === undefined || value === null) return urls;
+    if (Array.isArray(value)) {
+        value.forEach((item) => collectPhotoUrls(item, urls, photoContext));
+        return urls;
+    }
+    if (typeof value === 'string') {
+        const candidate = value.trim();
+        if (photoContext && /^(?:https?:)?\/\//i.test(candidate)) {
+            urls.push(candidate.startsWith('//') ? `https:${candidate}` : candidate);
+        }
+        return urls;
+    }
+    if (typeof value !== 'object') return urls;
+
+    for (const [key, child] of Object.entries(value)) {
+        const normalizedKey = key.toLowerCase();
+        const isPhotoKey = /photo|image|picture|gallery|media/.test(normalizedKey);
+        const isUrlKey = /^(?:@_)?(?:url|href|src|link)$/.test(normalizedKey);
+        if (isPhotoKey || (photoContext && isUrlKey)) {
+            collectPhotoUrls(child, urls, true);
+        } else if (photoContext && normalizedKey === '#text') {
+            collectPhotoUrls(child, urls, true);
+        }
+    }
+    return urls;
+}
+
+function extractPhotoUrls(value) {
+    return [...new Set(collectPhotoUrls({ photos: value }))];
+}
+
 /**
  * Достраивает произвольную запись до единой внутренней схемы и
  * вычисляет ключи сопоставления (contractKey / addressKey), по
@@ -39,6 +71,7 @@ function finalizeRecord(rec, source, syntheticId) {
     out.contractKey = extractContractKey(out.contractNumber);
     out.contractDate = extractContractDate(rec.contractDate) || extractContractDate(out.contractNumber);
     out.addressKey = normalizeAddressKey(out.city, out.address);
+    out.photos = extractPhotoUrls(rec.photos);
     return out;
 }
 
@@ -73,7 +106,8 @@ async function parseSiteJson(filePath) {
             description: o.description || o.cardDescription || null,
             contractNumber,
             contractDate: extractContractDate(contractNumber),
-            status: (o.status && typeof o.status === 'object') ? (o.status.type || 'active') : (o.status || 'active')
+            status: (o.status && typeof o.status === 'object') ? (o.status.type || 'active') : (o.status || 'active'),
+            photos: extractPhotoUrls(o)
             }, 'site', `site-${idx + 1}`);
         })
         .filter((r) => r.title || r.address);
@@ -315,7 +349,8 @@ async function parseKufarXml(filePathOrContent, isRawContent) {
                     floors: item.re_number_floors ?? item.house_number_floors ?? null,
                     description: cleanString(item.body),
                     contractNumber: cleanString(item.re_contract),
-                    status: 'active'
+                     status: 'active',
+                     photos: extractPhotoUrls(item)
                 }, 'kufar', `kufar-${idx + 1}`);
             })
             .filter((r) => r.title || r.contractNumber);
@@ -333,6 +368,7 @@ async function parseKufarXml(filePathOrContent, isRawContent) {
                 const v = item[field.key] !== undefined ? item[field.key] : item['@_' + field.key];
                 rec[field.key] = v && typeof v === 'object' ? (v['#text'] ?? null) : v;
             }
+            rec.photos = extractPhotoUrls(item);
             const rawId = rec.id || item['@_id'] || null;
             return finalizeRecord(rec, 'kufar', rawId || `kufar-${idx + 1}`);
         })

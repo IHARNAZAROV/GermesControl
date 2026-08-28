@@ -530,6 +530,8 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
                 .map((record) => record && record[field.key])
                 .find(hasRecordValue) ?? null;
         }
+        merged.photos = [...new Set([s, i, k]
+            .flatMap((record) => Array.isArray(record?.photos) ? record.photos : []))];
         // В отчёте показываем единый нормализованный номер, а не
         // случайную исходную форму из одного из источников.
         merged.contractNumber = contractNumber;
