@@ -137,6 +137,13 @@ export function renderObjects(container) {
         let rows = report.objects;
         if (activeFilter === 'problem') rows = rows.filter((o) => o.status !== 'ok');
         if (activeFilter === 'missing') rows = rows.filter((o) => o.status === 'missing');
+        // Старые сохранённые отчёты могли быть созданы без objectNumber.
+        // Номер восстанавливается по исходному порядку, а не по текущему
+        // фильтру, поэтому он остаётся стабильным во всех вкладках.
+        rows = rows.map((o) => ({
+            ...o,
+            objectNumber: o.objectNumber || report.objects.indexOf(o) + 1
+        }));
 
         tableHolder.innerHTML = '';
         tableHolder.appendChild(renderDataTable({
