@@ -1,4 +1,4 @@
-import { el, formatShortDate } from '../format.js';
+import { el, formatShortDate, sourceLogo, icon } from '../format.js';
 import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
 
@@ -12,10 +12,19 @@ function listingBadge(object) {
     return el('span', { class: 'badge badge-warning' }, `Снят с продажи${date}`);
 }
 
+function categoryIcon(sources) {
+    if (!sources || sources.length === 0) {
+        return el('div', { class: 'cat-card-icon cat-card-icon-neutral' }, [icon('shield', 20)]);
+    }
+    return el('div', { class: 'cat-card-icon-list' }, sources.map((source) =>
+        el('span', { class: 'cat-card-icon' }, [sourceLogo(source)])
+    ));
+}
+
 export function renderComparison(container) {
     container.innerHTML = '';
     container.appendChild(el('div', { class: 'page-title' }, 'Сравнение площадок'));
-    container.appendChild(el('div', { class: 'page-subtitle' }, 'Какие объекты потерялись при передаче данных между системами'));
+    container.appendChild(el('div', { class: 'page-subtitle' }, 'Какие объекты потерялись при передаче данных между системами. Снятые с продажи учитываются отдельно и не считаются пропущенными.'));
 
     const report = store.report;
     if (!report) {
@@ -25,16 +34,18 @@ export function renderComparison(container) {
 
     const cat = report.categories;
     const cards = [
-        ['Есть везде', cat.everywhere],
-        ['Только на сайте', cat.onlySite],
-        ['Только в ILVO', cat.onlyIlvo],
-        ['Только в Kufar', cat.onlyKufar],
-        ['Нет на сайте', cat.missingSite],
-        ['Нет в ILVO', cat.missingIlvo],
-        ['Нет в Kufar', cat.missingKufar]
+        { label: 'Есть везде', value: cat.everywhere, sources: ['site', 'ilvo', 'kufar'] },
+        { label: 'Только на сайте', value: cat.onlySite, sources: ['site'] },
+        { label: 'Только в ILVO', value: cat.onlyIlvo, sources: ['ilvo'] },
+        { label: 'Только в Kufar', value: cat.onlyKufar, sources: ['kufar'] },
+        { label: 'Нет на сайте', value: cat.missingSite, sources: ['site'] },
+        { label: 'Нет в ILVO', value: cat.missingIlvo, sources: ['ilvo'] },
+        { label: 'Нет в Kufar', value: cat.missingKufar, sources: ['kufar'] },
+        { label: 'Сняты с продажи', value: report.stats.soldCount || 0, sources: [] }
     ];
-    container.appendChild(el('div', { class: 'cat-grid' }, cards.map(([label, value]) =>
+    container.appendChild(el('div', { class: 'cat-grid' }, cards.map(({ label, value, sources }) =>
         el('div', { class: 'card cat-card' }, [
+            categoryIcon(sources),
             el('div', { class: 'cat-value' }, String(value)),
             el('div', { class: 'cat-label' }, label)
         ])
