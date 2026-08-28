@@ -12,7 +12,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 7;
+const REPORT_MATCHING_VERSION = 8;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -440,7 +440,16 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         for (const field of COMPARABLE_FIELDS) {
             const values = { site: s ? s[field.key] : undefined, ilvo: i ? i[field.key] : undefined, kufar: k ? k[field.key] : undefined };
             let mismatch = false;
-            for (const [srcA, srcB, recA, recB] of pairs) {
+            // ILVO is the source of truth for prices. Do not compare the
+            // website directly with Kufar: each external price must be
+            // checked against the ILVO price instead.
+            const comparisonPairs = ['price', 'priceUsd'].includes(field.key)
+                ? (i ? [
+                    ['site', 'ilvo', s, i],
+                    ['ilvo', 'kufar', i, k]
+                ] : [])
+                : pairs;
+            for (const [srcA, srcB, recA, recB] of comparisonPairs) {
                 if (recA && recB && fieldsDiffer(recA[field.key], recB[field.key], field)) mismatch = true;
             }
             if (mismatch) {
