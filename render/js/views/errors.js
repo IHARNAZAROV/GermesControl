@@ -19,10 +19,10 @@ const ERROR_FIELDS = {
     'Разное количество комнат': ['rooms']
 };
 
-function targetLabel(error) {
+function targetLabel(error, report) {
     return error.targetType === 'contract'
         ? `Договор ${error.target || '—'}`
-        : `№${error.target || '—'}`;
+        : `Договор ${findErrorObject(error, report)?.contractNumber || 'не указан'}`;
 }
 
 function severityBadge(sev) {
@@ -168,7 +168,7 @@ function openErrorDetails(error, report) {
             detailMeta('Где обнаружено', error.source || '—'),
             detailMeta('Дата проверки', error.date || '—'),
             detailMeta('Статус', error.status === 'open' ? 'Открыта' : 'Исправлена'),
-            detailMeta('Объект / договор', targetLabel(error))
+            detailMeta('Объект / договор', targetLabel(error, report))
         ])
     ];
 
@@ -255,7 +255,7 @@ export function renderErrors(container) {
             columns: [
                 { key: 'type', label: 'Тип' },
                 { key: 'description', label: 'Описание' },
-                { key: 'target', label: 'Объект / Договор', render: targetLabel },
+                { key: 'target', label: 'Объект / Договор', render: (error) => targetLabel(error, report) },
                 { key: 'source', label: 'Источник' },
                 { key: 'date', label: 'Дата проверки' },
                 { key: 'severity', label: 'Важность', render: (e) => severityBadge(e.severity) },
