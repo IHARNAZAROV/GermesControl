@@ -62,6 +62,22 @@ so the price discrepancy is reported inside one object.
 **How to apply:** keep price-only pairs separate; allow address matches with
 different prices so price mismatches remain visible to the comparison report.
 
+## Duplicate presentation keys
+The normalized contract key is also the deduplication key for repeated rows
+inside one source and for the contract registry itself. A source/reference ID
+or a missing object link must never create a second visible row for the same
+contract; the user-facing identity is the object's ordinal number and its
+human-readable title.
+
+**Why:** the same contract can arrive once as `41/1` and once as
+`Договор 41/1 от <date>`, while reference IDs are absent or differ between
+exports. Treating those as separate records inflated a roughly 60-object set
+to 127 rows.
+
+**How to apply:** normalize with `extractContractKey` before grouping or
+building contract rows; retain technical IDs only for internal linking and
+never expose them in tables or exports.
+
 ## Kufar feed schema
 The real static Kufar feed (URL is the `kufarXmlUrl` default in
 dataStore.js) is `<uedb><records><record>...</record></records></uedb>`,

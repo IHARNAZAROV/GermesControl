@@ -55,14 +55,14 @@ export function renderComparison(container) {
         tableHolder.innerHTML = '';
         tableHolder.appendChild(renderDataTable({
             columns: [
-                { key: 'id', label: 'ID' },
+                { key: 'objectNumber', label: '№' },
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
                 { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => chip(o.presence.site) },
                 { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => chip(o.presence.ilvo) },
                 { key: 'kufar', label: 'XML / Kufar', sortValue: (o) => o.presence.kufar, render: (o) => chip(o.presence.kufar) }
             ],
             rows,
-            searchFields: ['id', 'title'],
+            searchFields: ['objectNumber', 'title', 'city', 'address', 'contractNumber'],
             emptyText: 'Объекты не найдены'
         }));
     }

@@ -24,11 +24,14 @@ function kpiCard({ icon: iconName, value, label, delta, danger, featured }) {
 
 function issuesTable(errors) {
     const rows = errors.slice(0, 6);
+    const targetLabel = (error) => error.targetType === 'contract'
+        ? `Договор ${error.target || '—'}`
+        : `№${error.target || '—'}`;
     const head = el('div', { class: 'issues-row head' }, [
         el('div', {}, 'Объект / Договор'), el('div', {}, 'Проблема'), el('div', {}, 'Источник'), el('div', {}, 'Дата')
     ]);
     const body = rows.map((e) => el('div', { class: 'issues-row' }, [
-        el('div', {}, e.target || '—'),
+        el('div', {}, targetLabel(e)),
         el('div', {}, e.type),
         el('div', {}, e.source || '—'),
         el('div', {}, e.date)

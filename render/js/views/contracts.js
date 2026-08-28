@@ -48,12 +48,12 @@ export function renderContracts(container) {
             el('div', { class: 'card-title' }, `Объекты без договора (${objectsWithoutContract.length})`),
             renderDataTable({
                 columns: [
-                    { key: 'id', label: 'ID' },
+                    { key: 'objectNumber', label: '№' },
                     { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
                     { key: 'city', label: 'Город', render: (o) => o.city || '—' }
                 ],
                 rows: objectsWithoutContract,
-                searchFields: ['id', 'title'],
+                searchFields: ['objectNumber', 'title', 'city'],
                 pageSize: 10
             })
         ]));
@@ -79,12 +79,12 @@ export function renderContracts(container) {
                 { key: 'number', label: '№ договора' },
                 { key: 'date', label: 'Дата' },
                 { key: 'objTitle', label: 'Объект', render: (c) => (c.obj ? c.obj.title : '—') },
-                { key: 'objectId', label: 'ID группы', render: (c) => c.objectId || '—' },
+                { key: 'objectNumber', label: '№ объекта', render: (c) => c.obj ? c.obj.objectNumber : '—' },
                 { key: 'status', label: 'Статус', render: (c) => c.problem ? el('span', { class: 'badge badge-danger' }, c.problem) : el('span', { class: 'badge badge-success' }, '\u2713 ок') },
                 { key: 'problem', label: 'Проблема', render: (c) => c.problem || '—' }
             ],
             rows,
-            searchFields: ['number', 'objectId'],
+            searchFields: ['number', 'date'],
             emptyText: 'Договоры не найдены'
         }));
     }

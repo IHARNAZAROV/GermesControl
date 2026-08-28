@@ -16,12 +16,15 @@ const REPORT_LABELS = {
 
 function buildRows(reportType, report) {
     const { objects, errors, contracts } = report;
+    const errorTarget = (error) => error.targetType === 'contract'
+        ? `Договор ${error.target || ''}`
+        : `№${error.target || ''}`;
     switch (reportType) {
         case 'missing':
             return objects
                 .filter((o) => o.status === 'missing')
                 .map((o) => ({
-                    'ID группы': o.id,
+                    '№': o.objectNumber,
                     Объект: o.title || '',
                     Сайт: o.presence.site ? 'есть' : 'нет',
                     ILVO: o.presence.ilvo ? 'есть' : 'нет',
@@ -31,13 +34,13 @@ function buildRows(reportType, report) {
             return contracts.map((c) => ({
                 'Номер договора': c.number || '',
                 Дата: c.date || '',
-                'ID группы': c.objectId || '—'
+                '№ объекта': objects.find((o) => o.id === c.objectId)?.objectNumber || '—'
             }));
         case 'errors':
             return errors.map((e) => ({
                 Тип: e.type,
                 Описание: e.description,
-                'Объект / Договор': e.target,
+                'Объект / Договор': errorTarget(e),
                 Источник: e.source,
                 Дата: e.date,
                 Важность: e.severity,
@@ -48,7 +51,7 @@ function buildRows(reportType, report) {
                 .filter((o) => o.fieldDiffs && o.fieldDiffs.length)
                 .flatMap((o) =>
                     o.fieldDiffs.map((d) => ({
-                        'ID группы': o.id,
+                        '№': o.objectNumber,
                         Поле: d.label,
                         Сайт: d.values.site ?? '',
                         ILVO: d.values.ilvo ?? '',
@@ -58,7 +61,7 @@ function buildRows(reportType, report) {
         case 'full':
         default:
             return objects.map((o) => ({
-                'ID группы': o.id,
+                '№': o.objectNumber,
                 Объект: o.title || '',
                 Тип: o.type || '',
                 Город: o.city || '',

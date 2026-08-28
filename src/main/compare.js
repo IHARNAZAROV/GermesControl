@@ -90,6 +90,102 @@ function recordPrice(record) {
     return null;
 }
 
+function hasRecordValue(value) {
+    return value !== null && value !== undefined && value !== '';
+}
+
+/**
+ * Свернуть повторные строки внутри одного источника до сопоставления
+ * источников между собой. В выгрузках ILVO один объект может встречаться
+ * несколько раз с тем же договором (например, одна строка с датой, другая
+ * без даты). Такие строки не должны превращаться в разные объекты.
+ */
+function collapseSourceDuplicates(records) {
+    const result = [];
+    const byIdentity = new Map();
+
+    for (const record of records || []) {
+        const contractKey = recordContractKey(record);
+        const addressKey = recordAddressKey(record);
+        // Адрес — запасной ключ только для записей без договора. Адреса
+        // с улицей без номера не объединяем: на одной улице могут быть
+        // разные объекты.
+        const addressHasNumber = addressKey && /\d/.test(addressKey);
+        const identity = contractKey
+            ? `contract:${contractKey}`
+            : (addressHasNumber ? `address:${addressKey}` : null);
+        const existingIndex = identity ? byIdentity.get(identity) : undefined;
+
+        if (existingIndex === undefined) {
+            const copy = { ...record, _sourceIds: record.id ? [record.id] : [] };
+            result.push(copy);
+            if (identity) byIdentity.set(identity, result.length - 1);
+            continue;
+        }
+
+        const existing = result[existingIndex];
+        for (const key of OBJECT_FIELDS.map((field) => field.key)) {
+            const current = existing[key];
+            const incoming = record[key];
+            if (!hasRecordValue(current) && hasRecordValue(incoming)) {
+                existing[key] = incoming;
+            } else if (key === 'title' && String(incoming || '').length > String(current || '').length) {
+                existing[key] = incoming;
+            } else if (key === 'description' && String(incoming || '').length > String(current || '').length) {
+                existing[key] = incoming;
+            } else if (key === 'status' && incoming === 'sold') {
+                existing[key] = incoming;
+            }
+        }
+        if (record.id && !existing._sourceIds.includes(record.id)) {
+            existing._sourceIds.push(record.id);
+        }
+    }
+
+    return result;
+}
+
+function formatObjectTitle(record) {
+    const rawType = String(record.type || '').trim();
+    const type = rawType.toLowerCase();
+    const rooms = Number(record.rooms);
+    let propertyName = rawType || 'Объект недвижимости';
+
+    if (type.includes('квартир')) {
+        propertyName = Number.isFinite(rooms) && rooms > 0
+            ? `${rooms}-комнатная квартира`
+            : 'квартира';
+    } else if (type.includes('коммер')) {
+        propertyName = 'коммерческая недвижимость';
+    } else if (type.includes('участ')) {
+        propertyName = 'земельный участок';
+    } else if (type.includes('дом') || type.includes('дач')) {
+        propertyName = type.includes('дач') ? 'дача' : 'дом';
+    } else if (type) {
+        propertyName = rawType.charAt(0).toLowerCase() + rawType.slice(1);
+    }
+
+    const city = String(record.city || '').trim();
+    let cityPhrase = '';
+    if (city) {
+        cityPhrase = /^(г\.?|город)\s/i.test(city) || /(район|область)$/i.test(city)
+            ? `в ${city}`
+            : `в г. ${city}`;
+    }
+
+    const rawAddress = String(record.address || '').trim().replace(/\s+/g, ' ');
+    let addressPhrase = '';
+    if (rawAddress) {
+        const streetMatch = rawAddress.match(/^(?:ул\.?|улица)\s*(.+)$/i);
+        const avenueMatch = rawAddress.match(/^(?:пр\.?|проспект)\s*(.+)$/i);
+        if (streetMatch) addressPhrase = `на улице ${streetMatch[1]}`;
+        else if (avenueMatch) addressPhrase = `на проспекте ${avenueMatch[1]}`;
+        else addressPhrase = `по адресу ${rawAddress}`;
+    }
+
+    return [propertyName, cityPhrase, addressPhrase].filter(Boolean).join(' ') || record.title || 'Объект недвижимости';
+}
+
 function pricesMatch(a, b) {
     const priceA = recordPrice(a);
     const priceB = recordPrice(b);
@@ -251,7 +347,12 @@ const MISMATCH_TYPE_BY_FIELD = {
  * расхождения полей, список ошибок и агрегированную статистику.
  */
 function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
-    const groups = buildMatchGroups({ site, ilvo, kufar });
+    const sources = {
+        site: collapseSourceDuplicates(site),
+        ilvo: collapseSourceDuplicates(ilvo),
+        kufar: collapseSourceDuplicates(kufar)
+    };
+    const groups = buildMatchGroups(sources);
 
     const objects = [];
     const errors = [];
@@ -260,12 +361,13 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
     let errorSeq = 1;
     let objSeq = 1;
 
-    function pushError(type, description, target, source) {
+    function pushError(type, description, target, source, targetType = 'object') {
         errors.push({
             id: `ERR-${String(errorSeq++).padStart(4, '0')}`,
             type,
             description,
             target,
+            targetType,
             source,
             date: now,
             severity: ERROR_SEVERITY[type] || 'info',
@@ -279,18 +381,14 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
         const k = group.records.kufar || null;
         const presence = { site: !!s, ilvo: !!i, kufar: !!k };
         const primary = s || i || k;
+        const objectNumber = objSeq;
         const id = `MATCH-${String(objSeq++).padStart(4, '0')}`;
-        // Исходные ID принадлежат конкретной системе и не являются ID
-        // недвижимости. Для объединённой карточки используем собственный
-        // стабильный в рамках отчёта ID, а исходные значения сохраняем ниже.
-        const target = id;
-        const sourceIds = {
-            site: s && s.id ? s.id : null,
-            ilvo: i && i.id ? i.id : null,
-            kufar: k && k.id ? k.id : null
-        };
+        const target = objectNumber;
         for (const record of [s, i, k]) {
-            if (record && record.id) objectIdAliases.set(record.id, target);
+            if (!record) continue;
+            for (const sourceId of [record.id, ...(record._sourceIds || [])]) {
+                if (sourceId) objectIdAliases.set(sourceId, id);
+            }
         }
 
         const fieldDiffs = [];
@@ -351,13 +449,12 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
 
         objects.push({
             ...merged,
-            id: target,
-            title: merged.title || [primary.type, primary.address].filter(Boolean).join(', '),
+            id,
+            objectNumber,
+            title: formatObjectTitle(merged),
             presence,
             matchedBy: group.matchedBy,
             matchConfidence: group.matchedBy === 'contract' || group.matchedBy === 'address_price' ? 'strong' : (group.matchedBy === 'none' ? 'none' : 'review'),
-            sourceIds,
-            sourceIdsText: Object.entries(sourceIds).filter(([, sourceId]) => sourceId).map(([source, sourceId]) => `${source}: ${sourceId}`).join(' '),
             fieldDiffs,
             contractNumber,
             status
@@ -397,19 +494,19 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
     });
 
     const allContracts = [];
-    const contractsByIdentity = new Map();
-    function addContract(contract, index) {
+    const contractsByKey = new Map();
+    function addContract(contract) {
         const key = contract.key || recordContractKey(contract) || contract.number;
         if (!key) return;
-        const identity = `${key}::${contract.objectId || `orphan-${index}`}`;
-        const existing = contractsByIdentity.get(identity);
+        const existing = contractsByKey.get(key);
         if (!existing) {
-            contractsByIdentity.set(identity, contract);
+            contractsByKey.set(key, contract);
             allContracts.push(contract);
             return;
         }
-        // Сохраняем более полную запись реестра (дату), но не допускаем
-        // повторной строки для того же нормализованного договора и объекта.
+        // Номер договора — единый ключ объекта. Сохраняем более полную
+        // запись (дату и привязку), но не создаём вторую строку из-за
+        // другого формата номера или отсутствующей ссылки на объект.
         if (!existing.date && contract.date) existing.date = contract.date;
         if (!existing.objectId && contract.objectId) existing.objectId = contract.objectId;
     }
@@ -427,11 +524,11 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
     for (const [, list] of contractByKey.entries()) {
         const number = list[0].number;
         if (list.length > 1) {
-            pushError(ERROR_TYPES.DUPLICATE_CONTRACT, `Номер договора ${number} используется у ${list.length} записей`, number, 'Договоры');
+            pushError(ERROR_TYPES.DUPLICATE_CONTRACT, `Номер договора ${number} используется у ${list.length} записей`, number, 'Договоры', 'contract');
         }
         for (const c of list) {
             if (!c.objectId || !objectIds.has(c.objectId)) {
-                pushError(ERROR_TYPES.CONTRACT_NO_OBJECT, `Договор ${number} не привязан ни к одному объекту`, number, 'Договоры');
+                pushError(ERROR_TYPES.CONTRACT_NO_OBJECT, `Договор ${number} не привязан ни к одному объекту`, number, 'Договоры', 'contract');
             }
         }
     }
@@ -449,9 +546,9 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
     };
 
     const stats = {
-        siteCount: site.length,
-        ilvoCount: ilvo.length,
-        kufarCount: kufar.length,
+        siteCount: sources.site.length,
+        ilvoCount: sources.ilvo.length,
+        kufarCount: sources.kufar.length,
         totalUnique: total,
         matchPercent: total ? Math.round((everywhere / total) * 1000) / 10 : 0,
         problemsCount: objects.filter((o) => o.status !== 'ok').length,

@@ -4,6 +4,12 @@ import { renderDataTable } from '../components/table.js';
 
 const SEVERITY_LABEL = { critical: 'Критическая', warning: 'Предупреждение', info: 'Информационная' };
 
+function targetLabel(error) {
+    return error.targetType === 'contract'
+        ? `Договор ${error.target || '—'}`
+        : `№${error.target || '—'}`;
+}
+
 function severityBadge(sev) {
     if (sev === 'critical') return el('span', { class: 'badge badge-danger' }, SEVERITY_LABEL[sev]);
     if (sev === 'warning') return el('span', { class: 'badge badge-warning' }, SEVERITY_LABEL[sev]);
@@ -48,7 +54,7 @@ export function renderErrors(container) {
             columns: [
                 { key: 'type', label: 'Тип' },
                 { key: 'description', label: 'Описание' },
-                { key: 'target', label: 'Объект / Договор' },
+                { key: 'target', label: 'Объект / Договор', render: targetLabel },
                 { key: 'source', label: 'Источник' },
                 { key: 'date', label: 'Дата проверки' },
                 { key: 'severity', label: 'Важность', render: (e) => severityBadge(e.severity) },

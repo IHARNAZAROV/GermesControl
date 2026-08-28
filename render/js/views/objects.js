@@ -30,7 +30,7 @@ function matchBasis(obj) {
 
 function showObjectDetail(obj) {
     const rows = [
-        ['ID объединённой карточки', obj.id],
+        ['№ объекта', obj.objectNumber],
         ['Название', obj.title],
         ['Тип', obj.type],
         ['Тип сделки', obj.dealType],
@@ -50,7 +50,7 @@ function showObjectDetail(obj) {
         el('div', { class: 'matching-explanation' }, [
             el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-bottom:4px;' }, 'Основание объединения'),
             matchBasis(obj),
-            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-top:8px;' }, 'Исходные ID не сравниваются: каждая система выдаёт свой ID для той же недвижимости.')
+            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-top:8px;' }, 'Записи объединяются по номеру договора и адресу. Технические номера источников не показываются.')
         ]),
         el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-bottom:16px;' },
             rows.map(([label, value]) => el('div', {}, [
@@ -58,18 +58,6 @@ function showObjectDetail(obj) {
                 el('div', { style: 'font-weight:600;font-size:13px;' }, String(value ?? '—'))
             ]))
         ),
-        el('div', { style: 'margin-bottom:16px;' }, [
-            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-bottom:6px;' }, 'ID в источниках'),
-            ...[
-                ['Сайт', obj.presence.site, obj.sourceIds && obj.sourceIds.site],
-                ['ILVO', obj.presence.ilvo, obj.sourceIds && obj.sourceIds.ilvo],
-                ['Kufar', obj.presence.kufar, obj.sourceIds && obj.sourceIds.kufar]
-            ].map(([label, present, sourceId]) => el('div', { style: 'font-size:12px;margin-top:4px;' }, [
-                presenceChip(present, label),
-                el('span', { style: 'margin-left:7px;font-weight:600;' }, label),
-                el('span', { class: 'text-secondary', style: 'margin-left:6px;' }, sourceId || 'нет записи')
-            ]))
-        ]),
         el('div', { style: 'display:flex;gap:8px;margin-bottom:16px;' }, [
             presenceChip(obj.presence.site, 'Сайт'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'Сайт'),
             presenceChip(obj.presence.ilvo, 'ILVO'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'ILVO'),
@@ -93,7 +81,7 @@ function showObjectDetail(obj) {
         });
     }
 
-    openModal({ title: obj.title || obj.id, body, width: '560px' });
+    openModal({ title: obj.title || `Объект №${obj.objectNumber}`, body, width: '560px' });
 }
 
 export function renderObjects(container) {
@@ -123,7 +111,7 @@ export function renderObjects(container) {
                 el('div', { class: 'text-secondary' }, 'Одинаковая цена усиливает совпадение адреса. Одна только цена никогда не объединяет записи.')
             ])
         ]),
-        el('div', { class: 'matching-note' }, 'ID в источниках разные и не используются как признак объекта. В таблице показывается внутренний ID объединённой карточки MATCH-…; исходные ID доступны внутри карточки.')
+        el('div', { class: 'matching-note' }, 'Технические ID источников не используются как признак объекта и не показываются. Каждый объединённый объект имеет только порядковый номер.')
     ]));
 
     let activeFilter = 'all';
@@ -153,8 +141,8 @@ export function renderObjects(container) {
         tableHolder.innerHTML = '';
         tableHolder.appendChild(renderDataTable({
             columns: [
+                { key: 'objectNumber', label: '№' },
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
-                { key: 'id', label: 'ID группы' },
                 { key: 'type', label: 'Тип', render: (o) => o.type || '—' },
                 { key: 'city', label: 'Город', render: (o) => o.city || '—' },
                 { key: 'price', label: 'Цена', render: (o) => formatMoney(o.price, 'BYN') },
@@ -168,7 +156,7 @@ export function renderObjects(container) {
                 { key: 'actions', label: '', render: (o) => el('span', { class: 'btn btn-ghost btn-sm', onclick: () => showObjectDetail(o) }, 'Открыть') }
             ],
             rows,
-            searchFields: ['id', 'title', 'city', 'address', 'contractNumber', 'sourceIdsText'],
+            searchFields: ['objectNumber', 'title', 'city', 'address', 'contractNumber'],
             emptyText: 'Объекты не найдены'
         }));
     }
