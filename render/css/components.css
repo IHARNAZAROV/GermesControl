@@ -21,6 +21,8 @@
 .btn-ghost:hover { background: var(--color-surface-mint); color: var(--color-text); }
 .btn-sm { padding: 6px 12px; font-size: 12.5px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ui-icon { display: block; flex: 0 0 auto; object-fit: contain; }
+.btn .ui-icon { width: 16px; height: 16px; }
 
 /* ---------- Dropdown ---------- */
 .dropdown { position: relative; display: inline-block; }
@@ -86,6 +88,7 @@
     background: var(--color-surface-mint); color: var(--color-primary-dark);
     display: flex; align-items: center; justify-content: center; font-size: 17px;
 }
+.kpi-icon .ui-icon { width: 20px; height: 20px; }
 .kpi-card.is-site { border-top: 3px solid var(--color-success); }
 .kpi-card.is-site .kpi-icon { background: var(--color-success-bg); color: var(--color-success); }
 .kpi-card.is-ilvo { border-top: 3px solid #6A7FDB; }

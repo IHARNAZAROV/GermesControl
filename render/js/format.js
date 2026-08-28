@@ -58,6 +58,26 @@ const ICON_PATHS = {
     errorCircle: '<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>'
 };
 
+const UI_ICON_ASSETS = {
+    grid: 'accets/Menu.svg',
+    building: 'accets/Menu(1).svg',
+    file: 'accets/Paper.svg',
+    compare: 'accets/Arrow.svg',
+    alert: 'accets/Danger.svg',
+    chart: 'accets/Graph.svg',
+    report: 'accets/Chart.svg',
+    settings: 'accets/Setting.svg',
+    shield: 'accets/Shield.svg',
+    upload: 'accets/Paper.svg',
+    play: 'accets/Activity.svg',
+    check: 'accets/Tick.svg',
+    arrowRight: 'accets/Arrow.svg',
+    spark: 'accets/Star.svg',
+    info: 'accets/Info.svg',
+    warningTriangle: 'accets/Danger.svg',
+    errorCircle: 'accets/Danger.svg'
+};
+
 const SOURCE_ASSETS = {
     site: { path: 'accets/germes.webp', label: 'Сайт ГермесГарант' },
     ilvo: { path: 'accets/ilvo.png', label: 'ILVO CRM' },
@@ -65,6 +85,18 @@ const SOURCE_ASSETS = {
 };
 
 export function icon(name, size = 18) {
+    if (UI_ICON_ASSETS[name]) {
+        return el('img', {
+            class: `ui-icon ui-icon-${name}`,
+            src: UI_ICON_ASSETS[name],
+            width: String(size),
+            height: String(size),
+            alt: '',
+            draggable: 'false',
+            'aria-hidden': 'true'
+        });
+    }
+
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('width', String(size));

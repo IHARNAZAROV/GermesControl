@@ -1,4 +1,4 @@
-import { el } from '../format.js';
+import { el, icon } from '../format.js';
 import { openModal, closeModal } from './modal.js';
 import { runCheck } from '../state.js';
 import { showToast } from './toast.js';
@@ -16,7 +16,7 @@ const STEPS = [
 
 export async function runCheckWithProgress(onDone) {
     const stepNodes = STEPS.map((label) => el('div', { class: 'check-step' }, [
-        el('span', { class: 'check-mark' }, '\u25CB'),
+        el('span', { class: 'check-mark' }, [icon('play', 15)]),
         el('span', {}, label)
     ]));
 
@@ -31,7 +31,9 @@ export async function runCheckWithProgress(onDone) {
         await new Promise((r) => setTimeout(r, 180));
         stepNodes[i].classList.add('done');
         stepNodes[i].classList.remove('active');
-        stepNodes[i].querySelector('.check-mark').textContent = '\u2713';
+        const mark = stepNodes[i].querySelector('.check-mark');
+        mark.innerHTML = '';
+        mark.appendChild(icon('check', 15));
         if (i + 1 < stepNodes.length) stepNodes[i + 1].classList.add('active');
     }
 

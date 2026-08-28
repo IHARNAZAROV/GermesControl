@@ -1,4 +1,4 @@
-import { el, formatMoney, formatNumber } from '../format.js';
+import { el, formatMoney, formatNumber, icon } from '../format.js';
 import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
 import { closeModal, openModal } from '../components/modal.js';
@@ -97,7 +97,7 @@ function sourcePresence(object) {
     return el('div', { class: 'error-source-list' }, ['site', 'ilvo', 'kufar'].map((source) => {
         const present = object.presence && object.presence[source];
         return el('div', { class: `error-source-row ${present ? 'is-present' : 'is-missing'}` }, [
-            el('span', { class: 'error-source-mark' }, present ? '\u2713' : '\u00D7'),
+            el('span', { class: 'error-source-mark' }, [icon(present ? 'check' : 'errorCircle', 14)]),
             el('span', {}, SOURCE_LABELS[source]),
             el('span', { class: 'text-secondary' }, present ? 'Запись найдена' : 'Запись отсутствует')
         ]);

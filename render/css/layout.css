@@ -52,6 +52,7 @@
 .nav-item:hover { background: rgba(255,255,255,0.07); color: #FFFFFF; transform: translateX(2px); }
 .nav-item.active { background: linear-gradient(100deg, rgba(99,91,255,0.96), rgba(119,110,255,0.88)); color: #FFFFFF; box-shadow: 0 8px 18px rgba(14, 12, 46, 0.22); }
 .nav-item .nav-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.9; }
+.nav-item .nav-icon .ui-icon { width: 17px; height: 17px; filter: grayscale(1) brightness(0) invert(1); }
 .nav-item .nav-label { flex: 1; }
 .nav-item .nav-badge {
     background: #E05252;
@@ -70,6 +71,7 @@
     line-height: 1.5;
 }
 .sidebar-footer-icon { color: #827AFF; margin-bottom: 7px; }
+.sidebar-footer-icon .ui-icon { width: 16px; height: 16px; }
 .sidebar-footer-title { color: #D7D9EE; font-weight: 650; margin-bottom: 2px; }
 .sidebar-footer .version { margin-top: 9px; opacity: 0.55; }
 
