@@ -46,8 +46,10 @@ export function renderComparison(container) {
     container.appendChild(el('div', { class: 'cat-grid' }, cards.map(({ label, value, sources }) =>
         el('div', { class: 'card cat-card' }, [
             categoryIcon(sources),
-            el('div', { class: 'cat-value' }, String(value)),
-            el('div', { class: 'cat-label' }, label)
+            el('div', { class: 'cat-card-content' }, [
+                el('div', { class: 'cat-value' }, String(value)),
+                el('div', { class: 'cat-label' }, label)
+            ])
         ])
     )));
 
