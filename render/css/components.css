@@ -86,6 +86,12 @@
     background: var(--color-surface-mint); color: var(--color-primary-dark);
     display: flex; align-items: center; justify-content: center; font-size: 17px;
 }
+.kpi-card.is-site { border-top: 3px solid var(--color-success); }
+.kpi-card.is-site .kpi-icon { background: var(--color-success-bg); color: var(--color-success); }
+.kpi-card.is-ilvo { border-top: 3px solid #6A7FDB; }
+.kpi-card.is-ilvo .kpi-icon { background: #EEF1FF; color: #5268C7; }
+.kpi-card.is-kufar { border-top: 3px solid #D18A32; }
+.kpi-card.is-kufar .kpi-icon { background: var(--color-warning-bg); color: var(--color-warning); }
 .kpi-card.is-danger .kpi-icon { background: var(--color-danger-bg); color: var(--color-danger); }
 .kpi-card.is-featured { background: linear-gradient(135deg, #635BFF 0%, #4F48D1 100%); border-color: transparent; color: #fff; box-shadow: 0 14px 28px rgba(99, 91, 255, 0.22); }
 .kpi-card.is-featured::after { content: ''; position: absolute; width: 150px; height: 150px; right: -65px; bottom: -95px; border: 1px solid rgba(255,255,255,0.18); border-radius: 50%; box-shadow: 0 0 0 18px rgba(255,255,255,0.05), 0 0 0 36px rgba(255,255,255,0.035); }

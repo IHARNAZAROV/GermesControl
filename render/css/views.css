@@ -23,10 +23,24 @@
 .donut-legend-row .label { flex: 1; min-width: 0; color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .donut-legend-row .count { font-weight: 700; width: 40px; text-align: right; }
 .donut-legend-row .pct { width: 44px; text-align: right; color: var(--color-text-secondary); }
+.source-summary { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--color-border); }
+.source-summary-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 9px; border-radius: 11px; background: #FAFBFD; }
+.source-summary-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 12px; font-weight: 650; }
+.source-summary-main > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.source-summary-count { font-size: 13px; font-weight: 800; }
+.source-summary-unit { color: var(--color-text-secondary); font-size: 11px; }
+.source-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px; background: var(--color-surface-mint); color: var(--color-primary); }
+.source-site .source-icon { background: var(--color-success-bg); color: var(--color-success); }
+.source-ilvo .source-icon { background: #EEF1FF; color: #5268C7; }
+.source-kufar .source-icon { background: var(--color-warning-bg); color: var(--color-warning); }
 
 .issues-list { display: flex; flex-direction: column; }
 .issues-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.7fr); gap: 8px; padding: 11px 0; border-bottom: 1px solid var(--color-border); font-size: 11.5px; align-items: center; }
 .issues-row > * { min-width: 0; overflow-wrap: anywhere; }
+.issue-description { display: flex; align-items: flex-start; gap: 7px; }
+.issue-severity { display: inline-flex; flex: 0 0 auto; margin-top: 1px; }
+.issue-severity.critical { color: var(--color-danger); }
+.issue-severity.warning { color: var(--color-warning); }
 .issues-row:last-child { border-bottom: none; }
 .issues-row.head { color: var(--color-text-secondary); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.7px; }
 .issues-link { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary); font-weight: 750; font-size: 11.5px; margin-top: 11px; cursor: pointer; }
@@ -96,6 +110,8 @@
 .import-card { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .import-card { min-width: 0; }
 .import-card .imp-title { font-weight: 700; font-size: 14px; }
+.source-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.source-title > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .import-card .imp-file { font-size: 12.5px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .import-card .imp-count { font-size: 22px; font-weight: 800; }
 .import-actions, .settings-actions, .status-actions, .presence-list {
