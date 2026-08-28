@@ -13,6 +13,13 @@ function statusBadge(status) {
     return el('span', { class: 'badge badge-warning' }, '\u26A0 расхождение');
 }
 
+function formatObjectPrice(obj) {
+    if (obj.price !== null && obj.price !== undefined && obj.price !== '') {
+        return formatMoney(obj.price, 'BYN');
+    }
+    return formatMoney(obj.priceUsd, 'USD');
+}
+
 function matchBasis(obj) {
     const labels = {
         contract: 'По договору',
@@ -152,7 +159,7 @@ export function renderObjects(container) {
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
                 { key: 'type', label: 'Тип', render: (o) => o.type || '—' },
                 { key: 'city', label: 'Город', render: (o) => o.city || '—' },
-                { key: 'price', label: 'Цена', render: (o) => formatMoney(o.price, 'BYN') },
+                { key: 'price', label: 'Цена', render: formatObjectPrice },
                 { key: 'totalArea', label: 'Площадь', render: (o) => formatMoney(o.totalArea, 'м²') },
                 { key: 'contractNumber', label: 'Договор', render: (o) => o.contractNumber || '—' },
                 { key: 'matchedBy', label: 'Объединено', render: (o) => matchBasis(o) },

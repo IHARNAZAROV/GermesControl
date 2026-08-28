@@ -87,6 +87,46 @@ function extractNumberNear(text, regex) {
     return Number.isFinite(n) ? n : null;
 }
 
+function extractTotalAreaFromText(text) {
+    if (!text) return null;
+    // Нельзя заменять букву «м» без границ: она встречается внутри
+    // обычных слов («дом», «магазин») и ломает последующий поиск чисел.
+    const source = String(text).replace(
+        /(?<![0-9A-Za-zА-Яа-яЁё])(?:м²|м2|м|кв\.?\s*м)(?![0-9A-Za-zА-Яа-яЁё])/giu,
+        'м2'
+    );
+    // Сначала ищем только явно обозначенную общую площадь. Это важно:
+    // в описании рядом могут встречаться площади отдельных комнат, кухни
+    // или участка, которые нельзя принять за площадь объекта.
+    const explicit = source.match(
+        /(?:общ[а-я]*\s*(?:площад[а-я]*\s*)?|площад[а-я]*\s*[:\-—]?\s*общ[а-я]*\s*)[^0-9]{0,50}([\d.,]+)\s*м2/iu
+    );
+    if (explicit) {
+        const value = Number(explicit[1].replace(',', '.'));
+        if (Number.isFinite(value)) return value;
+    }
+
+    // Для домов в ILVO встречается короткая форма «дом площадью 72,5 м2».
+    // Не используем её для «комнаты площадью ...» и других частичных площадей.
+    const propertyArea = source.match(
+        /((?:дом|квартир[а-я]*|объект[а-я]*)[^.!?\n]{0,50}площад[а-я]*[^0-9]{0,20})([\d.,]+)\s*м2/iu
+    );
+    if (propertyArea && !/(комнат|жил|кух|участ)/iu.test(propertyArea[1])) {
+        const value = Number(propertyArea[2].replace(',', '.'));
+        if (Number.isFinite(value)) return value;
+    }
+
+    // И последняя безопасная эвристика для лаконичных описаний:
+    // «дом 132 м2» или «5/5 этаж, 43 м2».
+    const short = source.match(/(?:^|[,;])\s*([\d.,]+)\s*м2/iu)
+        || source.match(/(?:дом|квартир[а-я]*)\s*[:\-—]?\s*([\d.,]+)\s*м2/iu);
+    if (short) {
+        const value = Number(short[1].replace(',', '.'));
+        if (Number.isFinite(value)) return value;
+    }
+    return null;
+}
+
 function extractRoomsFromText(text, sheetName) {
     if (sheetName === 'Комната') return 1;
     return extractNumberNear(text, /(\d+)\s*-?\s*(?:к\b|К\b|комнатн)/i);
@@ -152,7 +192,7 @@ async function parseIlvoXlsx(filePath) {
                 price: row['Цена'] ?? null,
                 priceUsd: null,
                 rooms: extractRoomsFromText(desc, sheetName),
-                totalArea: extractNumberNear(desc, /общ[а-я]*\s*площад[а-я]*[^0-9]{0,15}([\d.,]+)/i),
+                totalArea: extractTotalAreaFromText(desc),
                 livingArea: extractNumberNear(desc, /жил[а-я]*\s*(?:площад[а-я]*)?[^0-9]{0,15}([\d.,]+)/i),
                 kitchenArea: extractNumberNear(desc, /кухн[а-я]*[^0-9]{0,15}([\d.,]+)/i),
                 floor: extractFloorFromText(desc),

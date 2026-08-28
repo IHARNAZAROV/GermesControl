@@ -11,7 +11,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 2;
+const REPORT_MATCHING_VERSION = 3;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -92,7 +92,10 @@ function recordPrice(record) {
 }
 
 function hasRecordValue(value) {
-    return value !== null && value !== undefined && value !== '';
+    return value !== null
+        && value !== undefined
+        && value !== ''
+        && !(typeof value === 'string' && ['-', '—'].includes(value.trim()));
 }
 
 /**
@@ -442,7 +445,12 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
 
         const merged = {};
         for (const field of OBJECT_FIELDS) {
-            merged[field.key] = primary[field.key] !== undefined ? primary[field.key] : null;
+            // A source can contain the object while omitting individual
+            // fields. Keep the source priority for conflicting values, but
+            // fill gaps from the other records in the same matched group.
+            merged[field.key] = [s, i, k]
+                .map((record) => record && record[field.key])
+                .find(hasRecordValue) ?? null;
         }
         // В отчёте показываем единый нормализованный номер, а не
         // случайную исходную форму из одного из источников.
