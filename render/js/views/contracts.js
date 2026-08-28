@@ -29,11 +29,27 @@ function compareContractNumbers(a, b) {
     return 0;
 }
 
+function contractSeparator(value) {
+    const match = String(value || '').match(/\d+\s*([/-])\s*[0-9A-Za-zА-Яа-яЁё]+/u);
+    return match ? match[1] : null;
+}
+
 function hasContractFormatMismatch(contract) {
-    const forms = Object.values(contract.obj?.contractForms || {})
-        .filter(Boolean)
-        .map((value) => String(value).replace(/\s+/g, ' ').trim().toLocaleLowerCase('ru-RU'));
-    return new Set(forms).size > 1;
+    const separators = Object.values(contract.obj?.contractForms || {})
+        .map(contractSeparator)
+        .filter(Boolean);
+    return new Set(separators).size > 1;
+}
+
+function sourceContractCell(contract, source) {
+    const value = contract[`${source}Contract`];
+    if (!value) return el('span', { class: 'text-secondary' }, '—');
+    const separator = contractSeparator(value);
+    const isDifferentSeparator = contract.isFormatMismatch && separator;
+    return el('span', {
+        class: isDifferentSeparator ? 'contract-source-value contract-source-value-diff' : 'contract-source-value',
+        title: isDifferentSeparator ? `В номере используется разделитель «${separator}»` : ''
+    }, value);
 }
 
 export function renderContracts(container) {
@@ -60,7 +76,17 @@ export function renderContracts(container) {
         let problem = null;
         if (isDuplicate) problem = 'Дубликат договора';
         else if (isOrphan) problem = 'Договор без объекта';
-        return { ...c, obj, isDuplicate, isOrphan, isFormatMismatch, problem };
+        return {
+            ...c,
+            obj,
+            siteContract: obj?.contractForms?.site || null,
+            ilvoContract: obj?.contractForms?.ilvo || null,
+            kufarContract: obj?.contractForms?.kufar || null,
+            isDuplicate,
+            isOrphan,
+            isFormatMismatch,
+            problem
+        };
     });
 
     const objectsWithoutContract = report.objects.filter((o) => !o.contractNumber && (
@@ -80,6 +106,17 @@ export function renderContracts(container) {
     const tableHolder = el('div');
     const card = el('div', { class: 'card card-pad' }, [chips, tableHolder]);
     container.appendChild(card);
+
+    const formatMismatchCount = enriched.filter((c) => c.isFormatMismatch).length;
+    if (formatMismatchCount) {
+        container.appendChild(el('div', { class: 'card card-pad contract-format-help' }, [
+            el('div', { class: 'card-title' }, 'Как читать расхождение разделителей'),
+            el('p', { class: 'card-subtitle', style: 'margin-top:8px;' },
+                'В колонках «Сайт», «ILVO» и «Kufar» показаны исходные значения. Например, 41/1 и 41-1 — один договор, но разделитель нужно привести к одному виду.'),
+            el('p', { class: 'card-subtitle', style: 'margin-top:6px;' },
+                'Исправлять нужно в выгрузке источника (чаще всего в ILVO), затем повторно импортировать файл и запустить проверку. Программа не изменяет исходные файлы автоматически.')
+        ]));
+    }
 
     if (report.contractRegistrySource === 'demo') {
         container.appendChild(el('div', { class: 'card card-pad', style: 'margin-top:16px;' }, [
@@ -124,6 +161,9 @@ export function renderContracts(container) {
         tableHolder.appendChild(renderDataTable({
             columns: [
                 { key: 'number', label: '№ договора', compare: compareContractNumbers },
+                { key: 'siteContract', label: 'Сайт', render: (c) => sourceContractCell(c, 'site') },
+                { key: 'ilvoContract', label: 'ILVO', render: (c) => sourceContractCell(c, 'ilvo') },
+                { key: 'kufarContract', label: 'Kufar', render: (c) => sourceContractCell(c, 'kufar') },
                 { key: 'date', label: 'Дата', render: (c) => formatShortDate(c.date) },
                 { key: 'objTitle', label: 'Объект', render: (c) => (c.obj ? c.obj.title : '—') },
                 { key: 'objectNumber', label: '№ объекта', render: (c) => c.obj ? c.obj.objectNumber : '—' },
@@ -143,7 +183,7 @@ export function renderContracts(container) {
                 }
             ],
             rows,
-            searchFields: ['number', 'date'],
+            searchFields: ['number', 'siteContract', 'ilvoContract', 'kufarContract', 'date'],
             emptyText: 'Договоры не найдены',
             initialSortKey: 'number'
         }));

@@ -12,7 +12,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 6;
+const REPORT_MATCHING_VERSION = 7;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -79,6 +79,16 @@ function contractSourceLabel(records) {
         .filter(([, value]) => hasRecordValue(value))
         .map(([source]) => source === 'site' ? 'Сайт' : source === 'ilvo' ? 'ILVO' : 'Kufar')
         .join(' / ');
+}
+
+function contractFormsDescription(records) {
+    return Object.entries(records)
+        .filter(([, value]) => hasRecordValue(value))
+        .map(([source, value]) => {
+            const label = source === 'site' ? 'Сайт' : source === 'ilvo' ? 'ILVO' : 'Kufar';
+            return `${label}: ${value}`;
+        })
+        .join('; ');
 }
 
 function contractSeparator(value) {
@@ -480,7 +490,7 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
                 });
                 pushError(
                     ERROR_TYPES.CONTRACT_FORMAT_MISMATCH,
-                    `Номер договора ${contractNumber} совпадает по смыслу, но использует разные разделители: "/" и "-"`,
+                    `Номер договора ${contractNumber} совпадает по смыслу, но использует разные разделители: "/" и "-". ${contractFormsDescription(contractForms)}`,
                     target,
                     contractSourceLabel(contractForms)
                 );
