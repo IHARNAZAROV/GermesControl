@@ -1,10 +1,10 @@
-import { el, formatMoney, formatDateTime, pluralize, icon } from '../format.js';
+import { el, formatMoney, formatDateTime, pluralize, icon, sourceLogo } from '../format.js';
 import { store, runCheck } from '../state.js';
 import { renderDonut } from '../components/donutChart.js';
 import { showToast } from '../components/toast.js';
 import { navigate } from '../router.js';
 
-function kpiCard({ icon: iconName, value, label, delta, danger, featured, tone }) {
+function kpiCard({ icon: iconName, logo, value, label, delta, danger, featured, tone }) {
     let deltaNode = null;
     if (delta !== undefined && delta !== null) {
         const dir = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
@@ -13,7 +13,7 @@ function kpiCard({ icon: iconName, value, label, delta, danger, featured, tone }
     }
     return el('div', { class: `kpi-card${danger ? ' is-danger' : ''}${featured ? ' is-featured' : ''}${tone ? ` is-${tone}` : ''}` }, [
         el('div', { class: 'kpi-top' }, [
-            el('div', { class: 'kpi-icon' }, [icon(iconName, 18)]),
+            el('div', { class: 'kpi-icon' }, [logo ? sourceLogo(logo) : icon(iconName, 18)]),
             featured ? el('span', { class: 'kpi-overline' }, 'В ФОКУСЕ') : null
         ]),
         el('div', { class: 'kpi-value' }, String(value)),
@@ -78,9 +78,9 @@ export function renderDashboard(container) {
 
     const deltas = report.deltas || {};
     const kpis = el('div', { class: 'kpi-grid' }, [
-        kpiCard({ icon: 'building', value: stats.siteCount, label: 'Объекты на сайте', delta: deltas.site, featured: true }),
-        kpiCard({ icon: 'database', value: stats.ilvoCount, label: 'Объекты в ILVO', delta: deltas.ilvo }),
-        kpiCard({ icon: 'compare', value: stats.kufarCount, label: 'Объекты в Kufar', delta: deltas.kufar }),
+        kpiCard({ logo: 'site', value: stats.siteCount, label: 'Объекты на сайте', delta: deltas.site, tone: 'site' }),
+        kpiCard({ logo: 'ilvo', value: stats.ilvoCount, label: 'Объекты в ILVO', delta: deltas.ilvo, tone: 'ilvo' }),
+        kpiCard({ logo: 'kufar', value: stats.kufarCount, label: 'Объекты в Kufar', delta: deltas.kufar, tone: 'kufar' }),
         kpiCard({ icon: 'alert', value: stats.problemsCount, label: 'Проблемы', danger: true, delta: deltas.problems })
     ]);
     container.appendChild(kpis);
@@ -94,9 +94,9 @@ export function renderDashboard(container) {
     ];
     const total = segments.reduce((s, x) => s + x.value, 0) || 1;
     const sources = [
-        { key: 'ilvo', label: 'ILVO CRM', count: stats.ilvoCount, icon: 'sourceIlvo' },
-        { key: 'site', label: 'Сайт ГермесГарант', count: stats.siteCount, icon: 'sourceSite' },
-        { key: 'kufar', label: 'Kufar', count: stats.kufarCount, icon: 'sourceKufar' }
+        { key: 'ilvo', label: 'ILVO CRM', count: stats.ilvoCount },
+        { key: 'site', label: 'Сайт ГермесГарант', count: stats.siteCount },
+        { key: 'kufar', label: 'Kufar', count: stats.kufarCount }
     ];
 
     const donutCard = el('div', { class: 'card card-pad' }, [
@@ -115,7 +115,7 @@ export function renderDashboard(container) {
         el('div', { class: 'source-summary' }, sources.map((source) =>
             el('div', { class: `source-summary-row source-${source.key}` }, [
                 el('div', { class: 'source-summary-main' }, [
-                    el('span', { class: 'source-icon' }, [icon(source.icon, 17)]),
+                    el('span', { class: 'source-icon' }, [sourceLogo(source.key)]),
                     el('span', {}, source.label)
                 ]),
                 el('span', { class: 'source-summary-count' }, String(source.count)),

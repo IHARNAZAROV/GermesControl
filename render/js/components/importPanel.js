@@ -1,12 +1,12 @@
-import { el, formatDateTime, icon } from '../format.js';
+import { el, formatDateTime, sourceLogo } from '../format.js';
 import { store, importSource, importKufarFromUrl } from '../state.js';
 import { openModal, closeModal } from './modal.js';
 import { showToast } from './toast.js';
 
 const SOURCE_META = {
-    site: { label: 'Сайт ГермесГарант', format: 'JSON', hint: 'Ручная выгрузка объектов сайта', icon: 'sourceSite' },
-    ilvo: { label: 'ILVO CRM', format: 'XLSX', hint: 'Ручная выгрузка объектов из ILVO', icon: 'sourceIlvo' },
-    kufar: { label: 'Kufar', format: 'XML', hint: 'Автоматическая выгрузка объявлений из ILVO', icon: 'sourceKufar' }
+    site: { label: 'Сайт ГермесГарант', format: 'JSON', hint: 'Ручная выгрузка объектов сайта' },
+    ilvo: { label: 'ILVO CRM', format: 'XLSX', hint: 'Ручная выгрузка объектов из ILVO' },
+    kufar: { label: 'Kufar', format: 'XML', hint: 'Автоматическая выгрузка объявлений из ILVO' }
 };
 
 function sourceCard(key, onChanged) {
@@ -21,7 +21,7 @@ function sourceCard(key, onChanged) {
 
     const title = key === 'kufar' ? meta.label : `${meta.label} (${meta.format})`;
     card.appendChild(el('div', { class: `imp-title source-title source-${key}` }, [
-        el('span', { class: 'source-icon' }, [icon(meta.icon, 17)]),
+        el('span', { class: 'source-icon' }, [sourceLogo(key)]),
         el('span', {}, title)
     ]));
     card.appendChild(el('div', { class: 'imp-file' }, info.fileName || 'Файл не загружен'));

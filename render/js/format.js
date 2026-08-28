@@ -53,12 +53,15 @@ const ICON_PATHS = {
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     database: '<ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5"/><path d="M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7"/>',
     spark: '<path d="m12 3-1.2 5.8L5 10l5.8 1.2L12 17l1.2-5.8L19 10l-5.8-1.2L12 3Z"/><path d="m19 17-.5 2.5L16 20l2.5.5L19 23l.5-2.5L22 20l-2.5-.5L19 17Z"/>',
-    sourceSite: '<path d="M4 21V9l8-5 8 5v12"/><path d="M8 21v-5h8v5M8 11h.01M12 11h.01M16 11h.01"/>',
-    sourceIlvo: '<path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M7 8h10M7 12h3M14 12h3M7 16h3M14 16h3"/>',
-    sourceKufar: '<path d="m12 3 2.4 5 5.6.8-4 3.9.9 5.6-4.9-2.7-4.9 2.7.9-5.6-4-3.9 5.6-.8L12 3Z"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
     warningTriangle: '<path d="m10.3 3.4-8 14A2 2 0 0 0 4 20.5h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
     errorCircle: '<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>'
+};
+
+const SOURCE_ASSETS = {
+    site: { path: 'accets/germes.webp', label: 'Сайт ГермесГарант' },
+    ilvo: { path: 'accets/ilvo.png', label: 'ILVO CRM' },
+    kufar: { path: 'accets/kufar.png', label: 'Kufar' }
 };
 
 export function icon(name, size = 18) {
@@ -74,6 +77,17 @@ export function icon(name, size = 18) {
     svg.setAttribute('aria-hidden', 'true');
     svg.innerHTML = ICON_PATHS[name] || ICON_PATHS.spark;
     return svg;
+}
+
+export function sourceLogo(source, className = '') {
+    const asset = SOURCE_ASSETS[source];
+    if (!asset) return null;
+    return el('img', {
+        class: `source-logo source-logo-${source}${className ? ` ${className}` : ''}`,
+        src: asset.path,
+        alt: asset.label,
+        draggable: 'false'
+    });
 }
 
 export function el(tag, attrs = {}, children = []) {

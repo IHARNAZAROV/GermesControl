@@ -1,4 +1,4 @@
-import { el, formatDateTime, icon } from './format.js';
+import { el, formatDateTime, icon, sourceLogo } from './format.js';
 import { store, loadState, subscribe } from './state.js';
 import { initRouter, navigate, onRouteChange, getCurrentRoute } from './router.js';
 import { openImportModal } from './components/importPanel.js';
@@ -88,9 +88,12 @@ function renderTopbar(activeRoute) {
     const item = NAV_ITEMS.find((i) => i.key === activeRoute);
     const now = new Date();
 
-    topbarEl.appendChild(el('div', { class: 'topbar-titles' }, [
-        el('h2', {}, item ? item.label : ''),
-        activeRoute === 'dashboard' ? el('p', {}, now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })) : null
+    topbarEl.appendChild(el('div', { class: 'topbar-title-block' }, [
+        el('div', { class: 'topbar-site-logo' }, [sourceLogo('site')]),
+        el('div', { class: 'topbar-titles' }, [
+            el('h2', {}, item ? item.label : ''),
+            activeRoute === 'dashboard' ? el('p', {}, now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })) : null
+        ])
     ]));
 
     const actions = el('div', { class: 'topbar-actions' }, [
