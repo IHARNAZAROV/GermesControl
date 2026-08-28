@@ -1,19 +1,20 @@
-import { el, formatMoney, formatDateTime, pluralize } from '../format.js';
+import { el, formatMoney, formatDateTime, pluralize, icon } from '../format.js';
 import { store, runCheck } from '../state.js';
 import { renderDonut } from '../components/donutChart.js';
 import { showToast } from '../components/toast.js';
 import { navigate } from '../router.js';
 
-function kpiCard({ icon, value, label, delta, danger }) {
+function kpiCard({ icon: iconName, value, label, delta, danger, featured }) {
     let deltaNode = null;
     if (delta !== undefined && delta !== null) {
         const dir = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
         const arrow = delta > 0 ? '\u2191' : delta < 0 ? '\u2193' : '\u2192';
         deltaNode = el('span', { class: `kpi-delta ${dir}` }, `${arrow} ${delta > 0 ? '+' : ''}${delta} с прошлой проверки`);
     }
-    return el('div', { class: `kpi-card${danger ? ' is-danger' : ''}` }, [
+    return el('div', { class: `kpi-card${danger ? ' is-danger' : ''}${featured ? ' is-featured' : ''}` }, [
         el('div', { class: 'kpi-top' }, [
-            el('div', { class: 'kpi-icon' }, icon),
+            el('div', { class: 'kpi-icon' }, [icon(iconName, 18)]),
+            featured ? el('span', { class: 'kpi-overline' }, 'В ФОКУСЕ') : null
         ]),
         el('div', { class: 'kpi-value' }, String(value)),
         el('div', { class: 'kpi-label' }, label),
@@ -69,10 +70,10 @@ export function renderDashboard(container) {
 
     const deltas = report.deltas || {};
     const kpis = el('div', { class: 'kpi-grid' }, [
-        kpiCard({ icon: '\u2302', value: stats.siteCount, label: 'Объекты на сайте', delta: deltas.site }),
-        kpiCard({ icon: '\u25A3', value: stats.ilvoCount, label: 'Объекты в ILVO', delta: deltas.ilvo }),
-        kpiCard({ icon: '\u21C4', value: stats.kufarCount, label: 'Объекты в XML Kufar', delta: deltas.kufar }),
-        kpiCard({ icon: '\u26A0', value: stats.problemsCount, label: 'Проблемы', danger: true, delta: deltas.problems })
+        kpiCard({ icon: 'building', value: stats.siteCount, label: 'Объекты на сайте', delta: deltas.site, featured: true }),
+        kpiCard({ icon: 'database', value: stats.ilvoCount, label: 'Объекты в ILVO', delta: deltas.ilvo }),
+        kpiCard({ icon: 'compare', value: stats.kufarCount, label: 'Объекты в XML Kufar', delta: deltas.kufar }),
+        kpiCard({ icon: 'alert', value: stats.problemsCount, label: 'Проблемы', danger: true, delta: deltas.problems })
     ]);
     container.appendChild(kpis);
 
@@ -103,7 +104,10 @@ export function renderDashboard(container) {
     const issuesCard = el('div', { class: 'card card-pad' }, [
         el('div', { class: 'card-title' }, 'Последние выявленные проблемы'),
         el('div', { style: 'margin-top:14px;' }, [issuesTable(report.errors)]),
-        el('div', { class: 'issues-link', onclick: () => navigate('errors') }, 'Все проблемы \u2192')
+        el('div', { class: 'issues-link', onclick: () => navigate('errors') }, [
+            'Все проблемы',
+            icon('arrowRight', 15)
+        ])
     ]);
 
     container.appendChild(el('div', { class: 'grid-2' }, [donutCard, issuesCard]));
@@ -111,7 +115,7 @@ export function renderDashboard(container) {
     container.appendChild(
         el('div', { class: 'card status-bar' }, [
             el('div', { class: 'status-main' }, [
-                el('div', { class: 'status-icon' }, '\u2713'),
+                el('div', { class: 'status-icon' }, [icon('check', 17)]),
                 el('div', {}, [
                     el('div', { class: 'status-title' }, 'Система работает корректно'),
                     el('div', { class: 'status-sub' }, 'Основные источники данных загружены')
@@ -125,7 +129,7 @@ export function renderDashboard(container) {
                 el('button', {
                     class: 'btn btn-primary',
                     onclick: async () => { await runCheck(); renderDashboard(container); }
-                }, 'Запустить проверку')
+                }, [icon('play', 15), 'Запустить проверку'])
             ])
         ])
     );

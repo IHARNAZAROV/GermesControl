@@ -1,4 +1,4 @@
-import { el, formatDateTime } from './format.js';
+import { el, formatDateTime, icon } from './format.js';
 import { store, loadState, subscribe } from './state.js';
 import { initRouter, navigate, onRouteChange, getCurrentRoute } from './router.js';
 import { openImportModal } from './components/importPanel.js';
@@ -14,14 +14,14 @@ import { renderReports } from './views/reports.js';
 import { renderSettings } from './views/settings.js';
 
 const NAV_ITEMS = [
-    { key: 'dashboard', icon: '\u2302', label: 'Главная' },
-    { key: 'objects', icon: '\u25A3', label: 'Объекты' },
-    { key: 'contracts', icon: '\u25A4', label: 'Договоры' },
-    { key: 'comparison', icon: '\u21C4', label: 'Сравнение площадок' },
-    { key: 'errors', icon: '\u26A0', label: 'Ошибки', badge: (s) => s.report ? s.report.stats.errorsCount : null },
-    { key: 'analytics', icon: '\u25A5', label: 'Аналитика' },
-    { key: 'reports', icon: '\u25A4', label: 'Отчёты' },
-    { key: 'settings', icon: '\u2699', label: 'Настройки' }
+    { key: 'dashboard', icon: 'grid', label: 'Главная' },
+    { key: 'objects', icon: 'building', label: 'Объекты' },
+    { key: 'contracts', icon: 'file', label: 'Договоры' },
+    { key: 'comparison', icon: 'compare', label: 'Сравнение площадок' },
+    { key: 'errors', icon: 'alert', label: 'Ошибки', badge: (s) => s.report ? s.report.stats.errorsCount : null },
+    { key: 'analytics', icon: 'chart', label: 'Аналитика' },
+    { key: 'reports', icon: 'report', label: 'Отчёты' },
+    { key: 'settings', icon: 'settings', label: 'Настройки' }
 ];
 
 const VIEWS = {
@@ -42,8 +42,17 @@ const topbarEl = document.getElementById('topbar');
 function renderSidebar(activeRoute) {
     sidebarEl.innerHTML = '';
     sidebarEl.appendChild(el('div', { class: 'sidebar-brand' }, [
-        el('h1', {}, 'Hermes Control'),
-        el('p', {}, 'Контроль объектов и договоров')
+        el('div', { class: 'brand-lockup' }, [
+            el('div', { class: 'brand-mark' }, [icon('spark', 18)]),
+            el('div', {}, [
+                el('h1', {}, 'Hermes Control'),
+                el('p', {}, 'Real estate intelligence')
+            ])
+        ]),
+        el('div', { class: 'brand-status' }, [
+            el('span', { class: 'status-pulse' }),
+            el('span', {}, 'Система активна')
+        ])
     ]));
 
     const nav = el('div', { class: 'sidebar-nav' });
@@ -53,7 +62,7 @@ function renderSidebar(activeRoute) {
             class: `nav-item${item.key === activeRoute ? ' active' : ''}`,
             onclick: () => navigate(item.key)
         }, [
-            el('span', { class: 'nav-icon' }, item.icon),
+            el('span', { class: 'nav-icon' }, [icon(item.icon, 17)]),
             el('span', { class: 'nav-label' }, item.label),
             badgeValue ? el('span', { class: 'nav-badge' }, String(badgeValue)) : null
         ]));
@@ -61,8 +70,9 @@ function renderSidebar(activeRoute) {
     sidebarEl.appendChild(nav);
 
     sidebarEl.appendChild(el('div', { class: 'sidebar-footer' }, [
-        el('div', {}, 'Надёжный контроль.'),
-        el('div', {}, 'Больше возможностей.'),
+        el('div', { class: 'sidebar-footer-icon' }, [icon('shield', 16)]),
+        el('div', { class: 'sidebar-footer-title' }, 'Рабочее пространство'),
+        el('div', {}, 'Все источники под контролем.'),
         el('div', { class: 'version' }, 'Версия 1.0.0')
     ]));
 }
@@ -84,11 +94,14 @@ function renderTopbar(activeRoute) {
     ]));
 
     const actions = el('div', { class: 'topbar-actions' }, [
-        el('button', { class: 'btn btn-secondary', onclick: () => openImportModal() }, ['\u2B07 Загрузить данные']),
+        el('button', { class: 'btn btn-secondary', onclick: () => openImportModal() }, [
+            icon('upload', 16),
+            'Загрузить данные'
+        ]),
         el('button', {
             class: 'btn btn-primary',
             onclick: () => runCheckWithProgress(() => rerenderCurrent())
-        }, 'Запустить проверку'),
+        }, [icon('play', 15), 'Запустить проверку']),
         el('div', { class: 'topbar-clock' }, [
             el('div', { class: 'time' }, now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })),
             el('div', {}, now.toLocaleDateString('ru-RU'))

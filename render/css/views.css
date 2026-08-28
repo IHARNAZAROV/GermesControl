@@ -1,6 +1,6 @@
 /* ---------- Page header ---------- */
-.page-title { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
-.page-subtitle { color: var(--color-text-secondary); font-size: 13px; margin-bottom: 20px; }
+.page-title { font-size: 23px; font-weight: 800; letter-spacing: -0.7px; margin-bottom: 5px; }
+.page-subtitle { color: var(--color-text-secondary); font-size: 12px; margin-bottom: 22px; }
 
 /* ---------- Dashboard ---------- */
 .dash-hero {
@@ -9,12 +9,12 @@
     justify-content: space-between;
     margin-bottom: 22px;
 }
-.dash-hero h1 { font-size: 24px; font-weight: 800; }
-.dash-hero .lead { color: var(--color-text-secondary); font-size: 13.5px; margin-top: 6px; max-width: 480px; }
+.dash-hero h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.8px; }
+.dash-hero .lead { color: var(--color-text-secondary); font-size: 12.5px; margin-top: 7px; max-width: 480px; }
 
-.grid-2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; margin-top: 20px; }
+.grid-2 { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 14px; margin-top: 16px; }
 
-.donut-wrap { display: flex; align-items: center; gap: 26px; }
+.donut-wrap { display: flex; align-items: center; gap: 24px; }
 .donut-center-label { text-align: center; }
 .donut-center-label .pct { font-size: 30px; font-weight: 800; color: var(--color-primary-dark); }
 .donut-center-label .caption { font-size: 11.5px; color: var(--color-text-secondary); }
@@ -25,22 +25,24 @@
 .donut-legend-row .pct { width: 44px; text-align: right; color: var(--color-text-secondary); }
 
 .issues-list { display: flex; flex-direction: column; }
-.issues-row { display: grid; grid-template-columns: 1.1fr 1.4fr 0.8fr 0.7fr; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--color-border); font-size: 12.5px; align-items: center; }
+.issues-row { display: grid; grid-template-columns: 1.1fr 1.4fr 0.8fr 0.7fr; gap: 8px; padding: 11px 0; border-bottom: 1px solid var(--color-border); font-size: 11.5px; align-items: center; }
 .issues-row:last-child { border-bottom: none; }
-.issues-row.head { color: var(--color-text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
-.issues-link { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary); font-weight: 700; font-size: 12.5px; margin-top: 10px; cursor: pointer; }
+.issues-row.head { color: var(--color-text-secondary); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.7px; }
+.issues-link { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary); font-weight: 750; font-size: 11.5px; margin-top: 11px; cursor: pointer; }
+.issues-link svg { transition: transform 0.18s ease; }
+.issues-link:hover svg { transform: translateX(3px); }
 
 .status-bar {
-    margin-top: 18px;
+    margin-top: 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
+    padding: 16px 19px;
 }
 .status-bar .status-main { display: flex; align-items: center; gap: 12px; }
-.status-bar .status-icon { width: 34px; height: 34px; border-radius: 50%; background: var(--color-success-bg); color: var(--color-success); display: flex; align-items: center; justify-content: center; font-size: 16px; }
-.status-bar .status-title { font-weight: 700; font-size: 14px; }
-.status-bar .status-sub { color: var(--color-text-secondary); font-size: 12.5px; margin-top: 2px; }
+.status-bar .status-icon { width: 35px; height: 35px; border-radius: 12px; background: var(--color-success-bg); color: var(--color-success); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.status-bar .status-title { font-weight: 750; font-size: 12.5px; }
+.status-bar .status-sub { color: var(--color-text-secondary); font-size: 11.5px; margin-top: 3px; }
 .status-bar .status-time { text-align: right; font-size: 12px; color: var(--color-text-secondary); margin-right: 16px; }
 .status-bar .status-time .value { font-weight: 700; color: var(--color-text); }
 
@@ -92,4 +94,17 @@
 @media (max-width: 1200px) {
     .kpi-grid, .cat-grid, .stat-grid, .import-grid, .report-grid { grid-template-columns: repeat(2, 1fr); }
     .grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+    .kpi-grid, .cat-grid, .stat-grid, .import-grid, .report-grid { grid-template-columns: 1fr 1fr; }
+    .dash-hero h1 { font-size: 21px; }
+    .status-bar { align-items: flex-start; gap: 14px; flex-direction: column; }
+}
+
+@media (max-width: 520px) {
+    .kpi-grid, .cat-grid, .stat-grid, .import-grid, .report-grid { grid-template-columns: 1fr; }
+    .topbar-actions .btn-secondary { display: none; }
+    .issues-row { grid-template-columns: 1.2fr 1fr; }
+    .issues-row > :nth-child(n+3) { display: none; }
 }
