@@ -39,20 +39,20 @@
 .nav-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 11px 12px;
+    gap: 14px;
+    padding: 13px 14px;
     border-radius: 13px;
     color: #A7AAC5;
     cursor: pointer;
-    font-size: 12.5px;
+    font-size: 13.5px;
     font-weight: 600;
     transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
     position: relative;
 }
 .nav-item:hover { background: rgba(255,255,255,0.07); color: #FFFFFF; transform: translateX(2px); }
 .nav-item.active { background: linear-gradient(100deg, rgba(99,91,255,0.96), rgba(119,110,255,0.88)); color: #FFFFFF; box-shadow: 0 8px 18px rgba(14, 12, 46, 0.22); }
-.nav-item .nav-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.9; }
-.nav-item .nav-icon .ui-icon { width: 17px; height: 17px; filter: grayscale(1) brightness(0) invert(1); }
+.nav-item .nav-icon { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; opacity: 1; }
+.nav-item .nav-icon .ui-icon { width: 22px; height: 22px; }
 .nav-item .nav-label { flex: 1; }
 .nav-item .nav-badge {
     background: #E05252;
@@ -149,7 +149,7 @@
     .sidebar-brand { padding-left: 9px; padding-right: 9px; }
     .brand-lockup { justify-content: center; }
     .brand-lockup > div:last-child, .brand-status, .nav-label, .nav-badge, .sidebar-footer { display: none; }
-    .nav-item { justify-content: center; padding: 12px; }
+    .nav-item { justify-content: center; padding: 13px 12px; }
     #topbar { padding: 14px 18px; }
     .topbar-clock, .topbar-user > div:last-child { display: none; }
     #view-root { padding: 24px 18px 36px; }
