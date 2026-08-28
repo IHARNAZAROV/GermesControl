@@ -12,6 +12,8 @@ const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const REPORT_FILE = path.join(DATA_DIR, 'lastReport.json');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 const HISTORY_LIMIT = 200;
+const UPLOAD_RETENTION_LIMIT = 5;
+const SOURCE_KEYS = ['site', 'ilvo', 'kufar'];
 
 const settings = new Store({
     name: 'settings',
@@ -27,8 +29,40 @@ const settings = new Store({
 function ensureDirs() {
     fs.ensureDirSync(DATA_DIR);
     fs.ensureDirSync(UPLOADS_DIR);
-    for (const src of ['site', 'ilvo', 'kufar']) {
+    for (const src of SOURCE_KEYS) {
         fs.ensureDirSync(path.join(UPLOADS_DIR, src));
+    }
+}
+
+function pruneUploadedFiles(sourceKey, protectedPaths = []) {
+    if (!SOURCE_KEYS.includes(sourceKey)) return;
+
+    const sourceDir = path.join(UPLOADS_DIR, sourceKey);
+    const protectedFiles = new Set(protectedPaths.filter(Boolean).map((filePath) => path.resolve(filePath)));
+    const files = fs.readdirSync(sourceDir, { withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => {
+            const filePath = path.join(sourceDir, entry.name);
+            try {
+                return { filePath, modifiedAt: fs.statSync(filePath).mtimeMs };
+            } catch (e) {
+                return null;
+            }
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.modifiedAt - a.modifiedAt || b.filePath.localeCompare(a.filePath));
+
+    for (const file of files.slice(UPLOAD_RETENTION_LIMIT)) {
+        if (!protectedFiles.has(path.resolve(file.filePath))) {
+            fs.removeSync(file.filePath);
+        }
+    }
+}
+
+function pruneAllUploadedFiles(state) {
+    for (const sourceKey of SOURCE_KEYS) {
+        const storedPath = state?.sources?.[sourceKey]?.meta?.storedPath;
+        pruneUploadedFiles(sourceKey, [storedPath]);
     }
 }
 
@@ -54,12 +88,18 @@ function seedInitialState() {
 function getState() {
     ensureDirs();
     if (!fs.existsSync(STATE_FILE)) {
-        return seedInitialState();
+        const state = seedInitialState();
+        pruneAllUploadedFiles(state);
+        return state;
     }
     try {
-        return fs.readJsonSync(STATE_FILE);
+        const state = fs.readJsonSync(STATE_FILE);
+        pruneAllUploadedFiles(state);
+        return state;
     } catch (e) {
-        return seedInitialState();
+        const state = seedInitialState();
+        pruneAllUploadedFiles(state);
+        return state;
     }
 }
 
@@ -100,6 +140,7 @@ function copyUploadedFile(sourceKey, originalPath) {
     const destName = `${ts}-${path.basename(originalPath)}`;
     const dest = path.join(UPLOADS_DIR, sourceKey, destName);
     fs.copySync(originalPath, dest);
+    pruneUploadedFiles(sourceKey, [dest]);
     return dest;
 }
 
@@ -108,6 +149,7 @@ function saveRawContent(sourceKey, fileNameHint, content) {
     const ts = dayjs().format('YYYYMMDD-HHmmss');
     const dest = path.join(UPLOADS_DIR, sourceKey, `${ts}-${fileNameHint}`);
     fs.writeFileSync(dest, content);
+    pruneUploadedFiles(sourceKey, [dest]);
     return dest;
 }
 

@@ -49,6 +49,11 @@ export function renderSettings(container) {
         }, 'Сохранить ссылку')
     ]);
 
+    const storageSection = el('div', { class: 'card card-pad settings-section' }, [
+        el('div', { class: 'card-title' }, 'Хранение загрузок'),
+        el('p', { class: 'card-subtitle', style: 'margin-top:8px;' }, 'Для каждого источника сохраняются 5 последних исходных файлов. Более старые файлы удаляются автоматически после нового импорта. Текущие данные, последний отчёт и история проверок не удаляются.')
+    ]);
+
     const dataSection = el('div', { class: 'card card-pad settings-section' }, [
         el('div', { class: 'card-title' }, 'Демо-данные'),
         el('p', { class: 'card-subtitle', style: 'margin: 8px 0 14px;' }, 'Скачайте примеры файлов в ожидаемом формате или восстановите демонстрационный набор данных.'),
@@ -79,6 +84,7 @@ export function renderSettings(container) {
 
     container.appendChild(profileSection);
     container.appendChild(sourceSection);
+    container.appendChild(storageSection);
     container.appendChild(dataSection);
     container.appendChild(aboutSection);
 }
