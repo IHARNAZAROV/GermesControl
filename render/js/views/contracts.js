@@ -73,7 +73,7 @@ export function renderContracts(container) {
         el('span', { class: 'filter-chip', onclick: (e) => setFilter('linked', e) }, `Привязаны к объектам (${enriched.filter((c) => c.obj).length})`),
         el('span', { class: 'filter-chip', onclick: (e) => setFilter('orphan', e) }, `Без объекта (${enriched.filter((c) => c.isOrphan).length})`),
         el('span', { class: 'filter-chip', onclick: (e) => setFilter('dup', e) }, `Дубли (${enriched.filter((c) => c.isDuplicate).length})`),
-        el('span', { class: 'filter-chip', onclick: (e) => setFilter('format', e) }, `Разный формат (${enriched.filter((c) => c.isFormatMismatch).length})`),
+        el('span', { class: 'filter-chip', onclick: (e) => setFilter('format', e) }, `Разные разделители (${enriched.filter((c) => c.isFormatMismatch).length})`),
         el('span', { class: 'filter-chip', onclick: (e) => setFilter('problem', e) }, `Проблемные (${enriched.filter((c) => c.problem).length})`)
     ]);
 
@@ -139,7 +139,7 @@ export function renderContracts(container) {
                 {
                     key: 'problem',
                     label: 'Проблема',
-                    render: (c) => c.problem || (c.isFormatMismatch ? 'Разный формат номера договора' : '—')
+                    render: (c) => c.problem || (c.isFormatMismatch ? 'Разные разделители номера договора' : '—')
                 }
             ],
             rows,

@@ -12,7 +12,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 5;
+const REPORT_MATCHING_VERSION = 6;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -81,12 +81,15 @@ function contractSourceLabel(records) {
         .join(' / ');
 }
 
-function contractPresentationKey(value) {
-    return String(value || '')
-        .replace(/\u00a0/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toLocaleLowerCase('ru-RU');
+function contractSeparator(value) {
+    const normalizedKey = extractContractKey(value);
+    if (!normalizedKey || !normalizedKey.includes('/')) return null;
+
+    // Проверяем только разделитель составного номера, а не префикс,
+    // пробелы или дату после номера договора. Дата не попадёт сюда:
+    // если в строке нет номера договора, normalizedKey будет null.
+    const match = String(value).match(/\d+\s*([/-])\s*[0-9A-Za-zА-Яа-яЁё]+/u);
+    return match ? match[1] : null;
 }
 
 function normalizedComparableText(value) {
@@ -460,11 +463,14 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             );
         } else if (uniqueContracts.size === 1) {
             const contractForms = { site: recordContractNumber(s), ilvo: recordContractNumber(i), kufar: recordContractNumber(k) };
-            const uniqueForms = new Set(Object.values(contractForms).filter(hasRecordValue).map(contractPresentationKey));
-            if (uniqueForms.size > 1) {
+            const uniqueSeparators = new Set(Object.values(contractForms)
+                .filter(hasRecordValue)
+                .map(contractSeparator)
+                .filter(Boolean));
+            if (uniqueSeparators.size > 1) {
                 fieldDiffs.push({
                     field: 'contractNumber',
-                    label: 'Формат номера договора',
+                    label: 'Разделитель номера договора',
                     values: {
                         site: contractForms.site ?? undefined,
                         ilvo: contractForms.ilvo ?? undefined,
@@ -474,7 +480,7 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
                 });
                 pushError(
                     ERROR_TYPES.CONTRACT_FORMAT_MISMATCH,
-                    `Номер договора ${contractNumber} совпадает по смыслу, но записан в разных форматах`,
+                    `Номер договора ${contractNumber} совпадает по смыслу, но использует разные разделители: "/" и "-"`,
                     target,
                     contractSourceLabel(contractForms)
                 );
