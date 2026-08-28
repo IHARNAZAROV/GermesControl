@@ -45,7 +45,7 @@ function renderSidebar(activeRoute) {
         el('div', { class: 'brand-lockup' }, [
             el('div', { class: 'brand-mark' }, [icon('spark', 18)]),
             el('div', {}, [
-                el('h1', {}, 'Hermes Control'),
+                el('h1', {}, 'GermesControl'),
                 el('p', {}, 'Real estate intelligence')
             ])
         ]),

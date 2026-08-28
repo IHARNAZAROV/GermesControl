@@ -1,5 +1,6 @@
 {
-  "name": "germes-control",
+  "name": "germescontrol",
+  "productName": "GermesControl",
   "version": "1.0.0",
   "description": "Система аналитики и контроля АН ГермесГарант",
   "main": "main.js",

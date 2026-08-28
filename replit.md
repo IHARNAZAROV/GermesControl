@@ -1,4 +1,4 @@
-# Hermes Control (GermesControl)
+# GermesControl
 
 ## Что это
 Desktop-приложение на Electron для АН «ГермесГарант»: сверяет объекты недвижимости

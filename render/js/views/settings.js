@@ -73,7 +73,7 @@ export function renderSettings(container) {
 
     const aboutSection = el('div', { class: 'card card-pad settings-section' }, [
         el('div', { class: 'card-title' }, 'О приложении'),
-        el('p', { class: 'card-subtitle', style: 'margin-top:8px;' }, 'Hermes Control — контроль объектов, договоров и рекламных площадок АН «ГермесГарант».'),
+        el('p', { class: 'card-subtitle', style: 'margin-top:8px;' }, 'GermesControl — контроль объектов, договоров и рекламных площадок АН «ГермесГарант».'),
         el('p', { class: 'card-subtitle' }, 'Версия 1.0.0')
     ]);
 
