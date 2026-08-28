@@ -98,7 +98,14 @@
 
 .topbar-titles h2 { font-size: 19px; font-weight: 750; letter-spacing: -0.45px; }
 .topbar-titles p { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 3px; }
-.topbar-titles { min-width: 0; overflow-wrap: anywhere; }
+.topbar-titles { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.topbar-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 11px; margin-top: 9px; min-height: 17px; font-size: 11px; }
+.topbar-health, .topbar-stat { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.topbar-health { font-weight: 700; }
+.topbar-health-fresh { color: var(--color-success); }
+.topbar-health-stale { color: var(--color-warning); }
+.topbar-health-missing, .topbar-stat-danger { color: var(--color-danger); }
+.topbar-summary .ui-icon { width: 14px; height: 14px; }
 .topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; min-width: 0; }
 
 .topbar-clock { text-align: right; font-size: 10.5px; color: var(--color-text-secondary); margin: 0 7px 0 11px; }
@@ -151,6 +158,7 @@
     .brand-lockup > div:last-child, .brand-status, .nav-label, .nav-badge, .sidebar-footer { display: none; }
     .nav-item { justify-content: center; padding: 13px 12px; }
     #topbar { padding: 14px 18px; }
+    .topbar-summary { gap: 8px; }
     .topbar-clock, .topbar-user > div:last-child { display: none; }
     #view-root { padding: 24px 18px 36px; }
 }
