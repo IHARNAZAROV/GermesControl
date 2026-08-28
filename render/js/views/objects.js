@@ -136,10 +136,8 @@ export function renderObjects(container) {
         tableHolder.innerHTML = '';
         tableHolder.appendChild(renderDataTable({
             columns: [
-                { key: 'objectNumber', label: '№' },
+                { key: 'objectNumber', label: '№', nowrap: true },
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
-                { key: 'type', label: 'Тип', render: (o) => o.type || '—' },
-                { key: 'city', label: 'Город', render: (o) => o.city || '—' },
                 { key: 'price', label: 'Цена', render: formatObjectPrice },
                 { key: 'totalArea', label: 'Площадь', render: (o) => formatMoney(o.totalArea, 'м²') },
                 { key: 'contractNumber', label: 'Договор', render: (o) => o.contractNumber || '—' },

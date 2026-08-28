@@ -88,7 +88,7 @@ export function renderDataTable({
             pageRows.forEach((row) => {
                 const tr = el('tr');
                 columns.forEach((col) => {
-                    const td = el('td', {});
+                    const td = el('td', { class: col.nowrap ? 'nowrap' : '' });
                     const value = col.render ? col.render(row) : (row[col.key] ?? '—');
                     if (value instanceof Node) td.appendChild(value);
                     else td.textContent = value;
