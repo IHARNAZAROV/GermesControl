@@ -1,7 +1,14 @@
 'use strict';
 
 const dayjs = require('dayjs');
-const { OBJECT_FIELDS, ERROR_TYPES, ERROR_SEVERITY, extractContractKey, cleanLocationText } = require('./schema');
+const {
+    OBJECT_FIELDS,
+    ERROR_TYPES,
+    ERROR_SEVERITY,
+    extractContractKey,
+    normalizeAddressKey,
+    cleanLocationText
+} = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
 
@@ -23,7 +30,7 @@ function isSubsetMatch(a, b) {
 }
 
 function fieldsDiffer(a, b, field) {
-    if (a === null || a === null || a === undefined || b === undefined) return false;
+    if (a === null || b === null || a === undefined || b === undefined) return false;
     if (a === null || b === null) return false;
     if (field.numeric) {
         const na = Number(a), nb = Number(b);
@@ -50,68 +57,99 @@ function fieldsDiffer(a, b, field) {
 
 const SRC_ORDER = ['site', 'ilvo', 'kufar'];
 
+function recordContractKey(record) {
+    return extractContractKey(record && (
+        record.contractNumber
+        ?? record.number
+        ?? record.contractKey
+        ?? record.key
+    ));
+}
+
+function recordAddressKey(record) {
+    if (!record) return null;
+    return normalizeAddressKey(record.city, record.address) || record.addressKey || null;
+}
+
+function addressMatches(a, b) {
+    const addressA = recordAddressKey(a);
+    const addressB = recordAddressKey(b);
+    if (!addressA || !addressB) return false;
+    if (addressA === addressB) return true;
+
+    const tokensA = tokenSet(addressA);
+    const tokensB = tokenSet(addressB);
+    if (isSubsetMatch(tokensA, tokensB)) return true;
+
+    // Учитываем варианты вроде «16к2» и «16к 2», а также короткую
+    // запись улицы относительно полного адреса.
+    const compactA = addressA.replace(/\s+/g, '');
+    const compactB = addressB.replace(/\s+/g, '');
+    return compactA.length > 0 && compactB.length > 0
+        && (compactA.includes(compactB) || compactB.includes(compactA));
+}
+
 /**
  * Сопоставляет записи трёх источников между собой, чтобы понять,
  * что это один и тот же реальный объект. Реальные источники не
- * имеют общего технического ID, поэтому сопоставление идёт в два
- * прохода:
- *   1. по нормализованному номеру договора (contractKey) — основной,
- *      надёжный признак;
- *   2. по нормализованному адресу (addressKey) — запасной признак
- *      для записей, у которых номер договора отсутствует или не
- *      совпал (в том числе это как раз и есть случай реального
- *      расхождения номера договора между системами).
- * Всё, что не нашло пары ни по одному признаку, остаётся отдельной,
- * непарной записью (объект есть только в одном источнике).
+ * имеют общего технического ID. Нормализованный номер договора —
+ * приоритетный ключ; нормализованный адрес — второй ключ, который
+ * объединяет даже записи с разными номерами договора. Это позволяет
+ * показать расхождение договора как проблему внутри одного объекта,
+ * а не создать два разных объекта.
  */
 function buildMatchGroups(bySource) {
-    const groups = new Map();
-    const order = [];
-    const consumed = new Set();
+    const groups = [];
+    let groupSeq = 0;
 
-    function ensureGroup(key, matchedBy) {
-        if (!groups.has(key)) {
-            groups.set(key, { key, matchedBy, records: {} });
-            order.push(key);
-        }
-        return groups.get(key);
-    }
+    function findMatch(group, rec) {
+        const recContractKey = recordContractKey(rec);
+        let contractMatch = false;
+        let addressMatch = false;
 
-    // Проход 1: по номеру договора.
-    for (const src of SRC_ORDER) {
-        for (const rec of bySource[src] || []) {
-            if (!rec.contractKey) continue;
-            const g = ensureGroup(`c:${rec.contractKey}`, 'contract');
-            if (!g.records[src]) {
-                g.records[src] = rec;
-                consumed.add(rec);
+        for (const existing of Object.values(group.records)) {
+            if (!existing) continue;
+            const existingContractKey = recordContractKey(existing);
+            if (recContractKey && existingContractKey && recContractKey === existingContractKey) {
+                contractMatch = true;
             }
+            if (addressMatches(rec, existing)) addressMatch = true;
         }
+
+        if (!contractMatch && !addressMatch) return null;
+        return {
+            contractMatch,
+            addressMatch,
+            score: (contractMatch ? 100 : 0) + (addressMatch ? 30 : 0)
+        };
     }
 
-    // Проход 2: по адресу — только для записей, ещё не вошедших в группу.
     for (const src of SRC_ORDER) {
         for (const rec of bySource[src] || []) {
-            if (consumed.has(rec) || !rec.addressKey) continue;
-            const g = ensureGroup(`a:${rec.addressKey}`, 'address');
-            if (!g.records[src]) {
-                g.records[src] = rec;
-                consumed.add(rec);
+            const candidates = groups
+                .filter((group) => !group.records[src])
+                .map((group) => ({ group, match: findMatch(group, rec) }))
+                .filter((candidate) => candidate.match)
+                .sort((a, b) => b.match.score - a.match.score);
+
+            if (candidates[0]) {
+                const { group, match } = candidates[0];
+                group.records[src] = rec;
+                // Не теряем информацию о том, что группа была связана
+                // по адресу: это важно для последующей ошибки договора.
+                if (match.contractMatch) group.matchedBy = 'contract';
+                continue;
             }
+
+            groups.push({
+                key: `group-${groupSeq++}`,
+                matchedBy: recordContractKey(rec) ? 'contract' : (recordAddressKey(rec) ? 'address' : 'none'),
+                records: { [src]: rec }
+            });
         }
     }
 
-    // Проход 3: всё оставшееся — непарные записи.
-    let seq = 0;
-    for (const src of SRC_ORDER) {
-        for (const rec of bySource[src] || []) {
-            if (consumed.has(rec)) continue;
-            ensureGroup(`u:${seq++}`, 'none').records[src] = rec;
-            consumed.add(rec);
-        }
-    }
-
-    return order.map((k) => groups.get(k));
+    return groups;
 }
 
 const MISMATCH_TYPE_BY_FIELD = {
@@ -183,14 +221,16 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
         }
 
         // Договор объекта отсутствует.
-        const contractNumber = (s && s.contractNumber) || (i && i.contractNumber) || (k && k.contractNumber) || null;
+        const contractNumber = [s, i, k]
+            .map(recordContractKey)
+            .find(Boolean) || null;
         const presentSourcesCount = [presence.site, presence.ilvo, presence.kufar].filter(Boolean).length;
         if (!contractNumber && presentSourcesCount > 0) {
             pushError(ERROR_TYPES.NO_CONTRACT, 'У объекта не указан номер договора', target, presence.site ? 'Сайт' : (presence.ilvo ? 'ILVO' : 'Kufar'));
         }
         // Расхождение номера договора между источниками (сопоставлено по адресу,
         // но номера договоров не совпадают или указаны не везде).
-        const contractValues = [s, i, k].filter(Boolean).map((r) => r.contractKey).filter(Boolean);
+        const contractValues = [s, i, k].filter(Boolean).map(recordContractKey).filter(Boolean);
         const uniqueContracts = new Set(contractValues);
         if (uniqueContracts.size > 1) {
             pushError(ERROR_TYPES.CONTRACT_MISMATCH, 'Номер договора отличается между источниками', target, 'Сайт / ILVO');
@@ -210,6 +250,9 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
         for (const field of OBJECT_FIELDS) {
             merged[field.key] = primary[field.key] !== undefined ? primary[field.key] : null;
         }
+        // В отчёте показываем единый нормализованный номер, а не
+        // случайную исходную форму из одного из источников.
+        merged.contractNumber = contractNumber;
 
         objects.push({
             ...merged,
@@ -230,13 +273,17 @@ function runComparison({ site, ilvo, kufar, contracts }, previousSnapshot) {
     // заданные записи, включая «сиротские» договоры без объекта.
     const derivedContracts = objects
         .filter((o) => o.contractNumber)
-        .map((o) => ({ number: o.contractNumber, key: extractContractKey(o.contractNumber), date: null, objectId: o.id }));
-    const allContracts = [...derivedContracts, ...(contracts || [])];
+        .map((o) => ({ number: o.contractNumber, key: o.contractNumber, date: null, objectId: o.id }));
+    const normalizedContracts = (contracts || []).map((contract) => {
+        const key = recordContractKey(contract) || contract.key || null;
+        return { ...contract, number: key || contract.number, key };
+    });
+    const allContracts = [...derivedContracts, ...normalizedContracts];
 
     // Проверки договоров.
     const contractByKey = new Map();
     for (const c of allContracts) {
-        const key = c.key || c.number;
+        const key = recordContractKey(c) || c.key || c.number;
         if (!key) continue;
         if (!contractByKey.has(key)) contractByKey.set(key, []);
         contractByKey.get(key).push(c);

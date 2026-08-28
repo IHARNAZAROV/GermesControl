@@ -36,6 +36,20 @@ containment first, then a whitespace-stripped substring check, before
 flagging a real mismatch — keep both checks if address comparison is ever
 reworked, or the noise returns.
 
+## Unicode normalization caveat
+JavaScript `\b` is ASCII-oriented even with the `u` flag, so it is not a
+reliable boundary for Cyrillic words or abbreviations such as `Договор` and
+`ул`. Use explicit lookarounds or whitespace/punctuation boundaries in
+normalizers.
+
+**Why:** contract and address fixtures exposed silent failures where Cyrillic
+prefixes were left in the value, preventing otherwise equivalent records from
+matching.
+
+**How to apply:** whenever changing `extractContractKey` or
+`cleanLocationText`, test both Cyrillic and Latin variants instead of relying
+on `\b` around Cyrillic text.
+
 ## Kufar feed schema
 The real static Kufar feed (URL is the `kufarXmlUrl` default in
 dataStore.js) is `<uedb><records><record>...</record></records></uedb>`,

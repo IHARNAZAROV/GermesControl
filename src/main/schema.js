@@ -74,15 +74,29 @@ const ERROR_SEVERITY = {
  */
 function extractContractKey(raw) {
     if (raw === undefined || raw === null) return null;
-    let s = String(raw).trim();
+    let s = String(raw).replace(/\u00a0/g, ' ').trim();
     if (!s || s === '-') return null;
-    const slashMatch = s.match(/(\d+[\/\-][0-9A-Za-zА-Яа-яЁё]*\d*)/);
-    if (slashMatch) return slashMatch[1].replace(/\s+/g, '');
-    s = s.replace(/^№\s*/, '').trim();
-    return s || null;
+
+    // Убираем служебную часть, дату и разные варианты префикса номера.
+    // Пробелы вокруг "/" и "-" не влияют на результат.
+    s = s
+        .replace(/(^|[\s,;:])договор(?:а|у|ом|е)?(?=$|[\s,;:])/giu, '$1')
+        .replace(/\b(?:от\s*)?\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*(?:г(?:ода)?)?\b/giu, ' ')
+        .replace(/[№#]/g, ' ')
+        .replace(/(^|[\s,;:])(?:no|n)(?=$|[\s,;:])/giu, '$1')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const compoundMatch = s.match(/(?:^|[^\d])(\d+)\s*[\/-]\s*([0-9A-Za-zА-Яа-яЁё]+)(?=$|[^\dA-Za-zА-Яа-яЁё])/u);
+    if (compoundMatch) return `${compoundMatch[1]}/${compoundMatch[2]}`.toUpperCase();
+
+    // Для простых номеров принимаем только оставшийся токен с номером,
+    // чтобы строка «от 21.07.2026» не превратилась в договор «21».
+    const simpleMatch = s.match(/^\d+[A-Za-zА-Яа-яЁё]*$/u);
+    return simpleMatch ? simpleMatch[0].toUpperCase() : null;
 }
 
-const ADDRESS_STOPWORDS = /\b(ул|улица|пр|проспект|пер|переулок|б-р|бульвар|бр|д|дом|г|город|пос|посёлок|поселок|ст|аг|агрогородок)\b\.?/g;
+const ADDRESS_STOPWORDS = /(?<![0-9A-Za-zА-Яа-яЁё])(ул|улица|пр|проспект|пер|переулок|б-р|бульвар|бр|д|дом|г|город|пос|посёлок|поселок|ст|аг|агрогородок)(?![0-9A-Za-zА-Яа-яЁё])\.?/giu;
 
 /**
  * Очищает произвольный адресный текст: убирает пунктуацию и типовые
@@ -100,15 +114,13 @@ function cleanLocationText(s) {
 }
 
 /**
- * Строит запасной («резервный») ключ сопоставления по адресу —
- * используется, когда номер договора отсутствует хотя бы в одном
- * источнике или отличается по формату.
+ * Строит нормализованный ключ адреса. Город намеренно не включается:
+ * сайт может передавать район, а ILVO — населённый пункт, хотя улица
+ * и номер дома у объекта одинаковые.
  */
 function normalizeAddressKey(city, address) {
-    const c = cleanLocationText(city);
     const a = cleanLocationText(address);
-    if (!c && !a) return null;
-    return `${c}|${a}`;
+    return a || null;
 }
 
 module.exports = { OBJECT_FIELDS, SOURCES, ERROR_TYPES, SEVERITY, ERROR_SEVERITY, extractContractKey, normalizeAddressKey, cleanLocationText };
