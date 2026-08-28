@@ -36,6 +36,10 @@ export function renderSettings(container) {
     const sourceSection = el('div', { class: 'card card-pad settings-section' }, [
         el('div', { class: 'card-title' }, 'Источники данных'),
         el('div', { class: 'form-row', style: 'margin-top:14px;' }, [
+            el('label', {}, 'Сайт ГермесГарант (автоматическая загрузка)'),
+            el('div', { class: 'card-subtitle' }, 'https://germesgarant.by/data/objects.json')
+        ]),
+        el('div', { class: 'form-row', style: 'margin-top:14px;' }, [
             el('label', {}, 'Ссылка на выгрузку Kufar (ILVO)'),
             el('input', { id: 'set-kufar-url', value: s.kufarXmlUrl || '' })
         ]),

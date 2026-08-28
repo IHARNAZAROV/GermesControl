@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const dayjs = require('dayjs');
 const store = require('./dataStore');
-const { parseSiteJson, parseIlvoXlsx, parseKufarXml } = require('./parsers');
+const { parseSiteJson, parseSiteJsonContent, parseIlvoXlsx, parseKufarXml } = require('./parsers');
 const { runComparison } = require('./compare');
 const { generateReport, REPORT_LABELS } = require('./reports');
 const { SOURCES } = require('./schema');
@@ -17,6 +17,8 @@ const FILE_FILTERS = {
 };
 
 const FORMAT_EXT = { xlsx: 'xlsx', csv: 'csv', json: 'json', pdf: 'pdf' };
+const SITE_JSON_URL = 'https://germesgarant.by/data/objects.json';
+const URL_REQUEST_TIMEOUT_MS = 30_000;
 
 function buildFullState() {
     const state = store.getState();
@@ -56,6 +58,47 @@ function registerIpcHandlers(getMainWindow) {
         if (canceled || !filePaths[0]) return { canceled: true };
         const result = await importFromPath(sourceKey, filePaths[0]);
         return { canceled: false, ...result };
+    });
+
+    ipcMain.handle('app:importSiteFromUrl', async () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), URL_REQUEST_TIMEOUT_MS);
+        let response;
+        try {
+            response = await fetch(SITE_JSON_URL, {
+                headers: { Accept: 'application/json' },
+                signal: controller.signal
+            });
+            if (!response.ok) {
+                throw new Error(`Сайт вернул ошибку HTTP ${response.status}.`);
+            }
+            const jsonText = await response.text();
+            let records;
+            try {
+                records = parseSiteJsonContent(jsonText);
+            } catch (error) {
+                throw new Error(`Сайт вернул некорректный JSON: ${error.message}`);
+            }
+            if (records.length === 0) {
+                throw new Error('В выгрузке сайта не найдено объектов.');
+            }
+
+            const storedPath = store.saveRawContent('site', 'objects.json', jsonText);
+            store.setSourceData('site', records, {
+                fileName: 'objects.json (сайт)',
+                storedPath,
+                sourceUrl: SITE_JSON_URL,
+                isDemo: false
+            });
+            return { sourceKey: 'site', count: records.length, fileName: 'objects.json (сайт)', sourceUrl: SITE_JSON_URL };
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                throw new Error('Сайт не ответил за 30 секунд. Проверьте подключение к интернету.');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+        }
     });
 
     ipcMain.handle('app:importKufarFromUrl', async (evt, url) => {

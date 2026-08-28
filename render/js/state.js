@@ -44,6 +44,12 @@ export async function importSource(sourceKey) {
     return result;
 }
 
+export async function importSiteFromUrl() {
+    const result = await window.electronAPI.importSiteFromUrl();
+    await loadState();
+    return result;
+}
+
 export async function importKufarFromUrl(url) {
     const result = await window.electronAPI.importKufarFromUrl(url);
     await loadState();

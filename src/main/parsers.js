@@ -76,15 +76,14 @@ function finalizeRecord(rec, source, syntheticId) {
 }
 
 /**
- * Сайт ГермесГарант — ручная выгрузка в формате JSON.
+ * Сайт ГермесГарант — выгрузка в формате JSON.
  * Ожидается массив объектов (либо { objects: [...] }) с полями вида
  * priceBYN/priceUSD, areaTotal/areaLiving/areaKitchen, floorsTotal,
  * description/cardDescription, status.type, contractNumber в формате
  * "Договор №N/M от ДД.ММ.ГГГГ".
  */
-async function parseSiteJson(filePath) {
-    const raw = await fs.readJson(filePath);
-    const list = Array.isArray(raw) ? raw : (Array.isArray(raw.objects) ? raw.objects : []);
+function parseSiteJsonData(raw) {
+    const list = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.objects) ? raw.objects : []);
     return list
         .map((o, idx) => {
             const contractNumber = o.contractNumber || null;
@@ -111,6 +110,15 @@ async function parseSiteJson(filePath) {
             }, 'site', `site-${idx + 1}`);
         })
         .filter((r) => r.title || r.address);
+}
+
+async function parseSiteJson(filePath) {
+    const raw = await fs.readJson(filePath);
+    return parseSiteJsonData(raw);
+}
+
+function parseSiteJsonContent(content) {
+    return parseSiteJsonData(JSON.parse(content));
 }
 
 const FLOORS_WORD_MAP = {
@@ -375,4 +383,4 @@ async function parseKufarXml(filePathOrContent, isRawContent) {
         .filter((r) => r.title || r.address || r.contractNumber);
 }
 
-module.exports = { parseSiteJson, parseIlvoXlsx, parseKufarXml, finalizeRecord };
+module.exports = { parseSiteJson, parseSiteJsonContent, parseIlvoXlsx, parseKufarXml, finalizeRecord };
