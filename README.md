@@ -34,6 +34,9 @@ npm start
 city, address, price, priceUsd, rooms, totalArea, livingArea, kitchenArea, floor,
 floors, description, contractNumber, status`. В «Настройках» есть кнопка «Скачать
 примеры файлов», которая генерирует образцы `.json/.xlsx/.xml` в этом формате.
+Для JSON сайта статус `status.type = "sold"` и `status.date` означают, что объект
+снят с продажи: его отсутствие на других площадках не считается ошибкой, а дата
+показывается в реестре объектов.
 
 ## Структура проекта
 

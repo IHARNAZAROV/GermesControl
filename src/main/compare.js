@@ -12,7 +12,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 8;
+const REPORT_MATCHING_VERSION = 9;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -175,6 +175,9 @@ function collapseSourceDuplicates(records) {
             } else if (key === 'status' && incoming === 'sold') {
                 existing[key] = incoming;
             }
+        }
+        if (!hasRecordValue(existing.statusDate) && hasRecordValue(record.statusDate)) {
+            existing.statusDate = record.statusDate;
         }
         if (record.id && !existing._sourceIds.includes(record.id)) {
             existing._sourceIds.push(record.id);
@@ -419,6 +422,10 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         const i = group.records.ilvo || null;
         const k = group.records.kufar || null;
         const presence = { site: !!s, ilvo: !!i, kufar: !!k };
+        const soldRecords = [s, i, k].filter((record) => record?.status === 'sold');
+        const soldRecord = soldRecords[0] || null;
+        const listingStatus = soldRecord ? 'sold' : 'active';
+        const listingStatusDate = soldRecords.map((record) => record.statusDate).find(hasRecordValue) || null;
         const primary = s || i || k;
         const objectNumber = objSeq;
         const id = `MATCH-${String(objSeq++).padStart(4, '0')}`;
@@ -506,7 +513,7 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             }
         }
 
-        if (presentSourcesCount > 1) {
+        if (presentSourcesCount > 1 && !soldRecord) {
             if (!presence.site) pushError(ERROR_TYPES.MISSING_SITE, 'Объект есть в других источниках, но отсутствует на сайте', target, presence.ilvo ? 'ILVO' : 'Kufar');
             if (!presence.ilvo) pushError(ERROR_TYPES.MISSING_ILVO, 'Объект есть в других источниках, но отсутствует в ILVO', target, presence.site ? 'Сайт' : 'Kufar');
             if (!presence.kufar) pushError(ERROR_TYPES.MISSING_KUFAR, 'Объект есть в других источниках, но отсутствует в Kufar', target, presence.site ? 'Сайт' : 'ILVO');
@@ -551,6 +558,8 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             matchConfidence: group.matchedBy === 'contract' || group.matchedBy === 'address_price' ? 'strong' : (group.matchedBy === 'none' ? 'none' : 'review'),
             fieldDiffs,
             contractNumber,
+            listingStatus,
+            listingStatusDate,
             status
         });
     }
@@ -653,15 +662,16 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
     }
 
     const total = objects.length;
-    const everywhere = objects.filter((o) => o.presence.site && o.presence.ilvo && o.presence.kufar).length;
+    const activeObjects = objects.filter((o) => o.listingStatus !== 'sold');
+    const everywhere = activeObjects.filter((o) => o.presence.site && o.presence.ilvo && o.presence.kufar).length;
     const categories = {
         everywhere,
-        onlySite: objects.filter((o) => o.presence.site && !o.presence.ilvo && !o.presence.kufar).length,
-        onlyIlvo: objects.filter((o) => !o.presence.site && o.presence.ilvo && !o.presence.kufar).length,
-        onlyKufar: objects.filter((o) => !o.presence.site && !o.presence.ilvo && o.presence.kufar).length,
-        missingSite: objects.filter((o) => !o.presence.site && (o.presence.ilvo || o.presence.kufar)).length,
-        missingIlvo: objects.filter((o) => !o.presence.ilvo && (o.presence.site || o.presence.kufar)).length,
-        missingKufar: objects.filter((o) => !o.presence.kufar && (o.presence.site || o.presence.ilvo)).length
+        onlySite: activeObjects.filter((o) => o.presence.site && !o.presence.ilvo && !o.presence.kufar).length,
+        onlyIlvo: activeObjects.filter((o) => !o.presence.site && o.presence.ilvo && !o.presence.kufar).length,
+        onlyKufar: activeObjects.filter((o) => !o.presence.site && !o.presence.ilvo && o.presence.kufar).length,
+        missingSite: activeObjects.filter((o) => !o.presence.site && (o.presence.ilvo || o.presence.kufar)).length,
+        missingIlvo: activeObjects.filter((o) => !o.presence.ilvo && (o.presence.site || o.presence.kufar)).length,
+        missingKufar: activeObjects.filter((o) => !o.presence.kufar && (o.presence.site || o.presence.ilvo)).length
     };
 
     const stats = {
@@ -669,14 +679,14 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         ilvoCount: sources.ilvo.length,
         kufarCount: sources.kufar.length,
         totalUnique: total,
-        matchPercent: total ? Math.round((everywhere / total) * 1000) / 10 : 0,
+        matchPercent: activeObjects.length ? Math.round((everywhere / activeObjects.length) * 1000) / 10 : 0,
         problemsCount: objects.filter((o) => o.status !== 'ok').length,
         errorsCount: errors.length,
         criticalCount: errors.filter((e) => e.severity === 'critical').length,
         warningCount: errors.filter((e) => e.severity === 'warning').length,
         infoCount: errors.filter((e) => e.severity === 'info').length,
-        activeCount: objects.filter((o) => o.status !== undefined && o.status !== 'sold').length,
-        soldCount: objects.filter((o) => o.status === 'sold').length,
+        activeCount: activeObjects.length,
+        soldCount: objects.length - activeObjects.length,
         withContract: objects.filter((o) => !!o.contractNumber).length,
         withoutContract: objects.filter((o) => !o.contractNumber).length
     };

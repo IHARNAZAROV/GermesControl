@@ -68,6 +68,7 @@ function finalizeRecord(rec, source, syntheticId) {
     }
     out.id = out.id || syntheticId;
     out.source = source;
+    out.statusDate = cleanString(rec.statusDate);
     out.contractKey = extractContractKey(out.contractNumber);
     out.contractDate = extractContractDate(rec.contractDate) || extractContractDate(out.contractNumber);
     out.addressKey = normalizeAddressKey(out.city, out.address);
@@ -105,7 +106,10 @@ function parseSiteJsonData(raw) {
             description: o.description || o.cardDescription || null,
             contractNumber,
             contractDate: extractContractDate(contractNumber),
-            status: (o.status && typeof o.status === 'object') ? (o.status.type || 'active') : (o.status || 'active'),
+            status: (o.status && typeof o.status === 'object')
+                ? String(o.status.type || 'active').toLowerCase()
+                : String(o.status || 'active').toLowerCase(),
+            statusDate: (o.status && typeof o.status === 'object') ? o.status.date || null : null,
             photos: extractPhotoUrls(o)
             }, 'site', `site-${idx + 1}`);
         })

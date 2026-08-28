@@ -1,4 +1,4 @@
-import { el, formatMoney } from '../format.js';
+import { el, formatMoney, formatShortDate } from '../format.js';
 import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
 import { openModal } from '../components/modal.js';
@@ -7,7 +7,14 @@ function presenceChip(present, label) {
     return el('span', { class: `presence-chip ${present ? 'ok' : 'no'}`, title: label }, present ? '\u2713' : '\u00D7');
 }
 
-function statusBadge(status) {
+function statusBadge(status, listingStatus, listingStatusDate) {
+    if (listingStatus === 'sold') {
+        const date = listingStatusDate ? ` · ${formatShortDate(listingStatusDate)}` : '';
+        return el('span', {
+            class: 'badge badge-warning',
+            title: listingStatusDate ? `Дата снятия с продажи: ${formatShortDate(listingStatusDate)}` : 'Объект продан'
+        }, `Снят с продажи${date}`);
+    }
     if (status === 'ok') return el('span', { class: 'badge badge-success' }, '\u2713 ок');
     if (status === 'missing') return el('span', { class: 'badge badge-danger' }, '\u00D7 отсутствует');
     return el('span', { class: 'badge badge-warning' }, '\u26A0 расхождение');
@@ -81,7 +88,9 @@ function showObjectDetail(obj) {
         ['Жилая площадь', formatMoney(obj.livingArea, 'м²')],
         ['Площадь кухни', formatMoney(obj.kitchenArea, 'м²')],
         ['Этаж', `${obj.floor ?? '—'} / ${obj.floors ?? '—'}`],
-        ['Договор', obj.contractNumber || '—']
+        ['Договор', obj.contractNumber || '—'],
+        ['Статус размещения', obj.listingStatus === 'sold' ? 'Снят с продажи' : 'Активен'],
+        ['Дата снятия с продажи', obj.listingStatusDate ? formatShortDate(obj.listingStatusDate) : '—']
     ];
 
     const body = [
@@ -180,7 +189,7 @@ export function renderObjects(container) {
                 { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => presenceChip(o.presence.site) },
                 { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => presenceChip(o.presence.ilvo) },
                 { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => presenceChip(o.presence.kufar) },
-                { key: 'status', label: 'Статус', render: (o) => statusBadge(o.status) },
+                { key: 'status', label: 'Статус', render: (o) => statusBadge(o.status, o.listingStatus, o.listingStatusDate) },
                 { key: 'actions', label: '', render: (o) => el('span', { class: 'btn btn-ghost btn-sm', onclick: () => showObjectDetail(o) }, 'Открыть') }
             ],
             rows,
