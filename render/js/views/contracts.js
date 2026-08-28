@@ -35,21 +35,33 @@ function contractSeparator(value) {
 }
 
 function hasContractFormatMismatch(contract) {
-    const separators = Object.values(contract.obj?.contractForms || {})
-        .map(contractSeparator)
-        .filter(Boolean);
-    return new Set(separators).size > 1;
+    return new Set(contractSeparators(contract)).size > 1;
 }
 
-function sourceContractCell(contract, source) {
-    const value = contract[`${source}Contract`];
-    if (!value) return el('span', { class: 'text-secondary' }, '—');
-    const separator = contractSeparator(value);
-    const isDifferentSeparator = contract.isFormatMismatch && separator;
+function contractSeparators(contract) {
+    return Object.entries(contract.obj?.contractForms || {})
+        .map(([source, value]) => ({ source, separator: contractSeparator(value) }))
+        .filter(({ separator }) => separator);
+}
+
+function contractFormatHint(contract) {
+    if (!contract.isFormatMismatch) return el('span', { class: 'text-secondary' }, '—');
+
+    const entries = contractSeparators(contract);
+    const counts = new Map();
+    entries.forEach(({ separator }) => counts.set(separator, (counts.get(separator) || 0) + 1));
+    const common = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    const different = entries.filter(({ separator }) => separator !== common[0]);
+    const sourceLabels = { site: 'Сайт', ilvo: 'ILVO', kufar: 'Kufar' };
+
+    const text = different.length && common[1] > different.length
+        ? `${different.map(({ source, separator }) => `${sourceLabels[source]}: «${separator}»`).join(', ')}; остальные: «${common[0]}»`
+        : entries.map(({ source, separator }) => `${sourceLabels[source]}: «${separator}»`).join('; ');
+
     return el('span', {
-        class: isDifferentSeparator ? 'contract-source-value contract-source-value-diff' : 'contract-source-value',
-        title: isDifferentSeparator ? `В номере используется разделитель «${separator}»` : ''
-    }, value);
+        class: 'contract-format-hint',
+        title: 'Номер договора нормализован, но разделители в источниках различаются'
+    }, text);
 }
 
 export function renderContracts(container) {
@@ -79,9 +91,6 @@ export function renderContracts(container) {
         return {
             ...c,
             obj,
-            siteContract: obj?.contractForms?.site || null,
-            ilvoContract: obj?.contractForms?.ilvo || null,
-            kufarContract: obj?.contractForms?.kufar || null,
             isDuplicate,
             isOrphan,
             isFormatMismatch,
@@ -112,7 +121,7 @@ export function renderContracts(container) {
         container.appendChild(el('div', { class: 'card card-pad contract-format-help' }, [
             el('div', { class: 'card-title' }, 'Как читать расхождение разделителей'),
             el('p', { class: 'card-subtitle', style: 'margin-top:8px;' },
-                'В колонках «Сайт», «ILVO» и «Kufar» показаны исходные значения. Например, 41/1 и 41-1 — один договор, но разделитель нужно привести к одному виду.'),
+                'В колонке «Подсказка» указано, в каком источнике используется другой разделитель. Например: ILVO: «-», остальные источники: «/». Номера 41/1 и 41-1 при этом считаются одним договором.'),
             el('p', { class: 'card-subtitle', style: 'margin-top:6px;' },
                 'Исправлять нужно в выгрузке источника (чаще всего в ILVO), затем повторно импортировать файл и запустить проверку. Программа не изменяет исходные файлы автоматически.')
         ]));
@@ -161,12 +170,10 @@ export function renderContracts(container) {
         tableHolder.appendChild(renderDataTable({
             columns: [
                 { key: 'number', label: '№ договора', compare: compareContractNumbers },
-                { key: 'siteContract', label: 'Сайт', render: (c) => sourceContractCell(c, 'site') },
-                { key: 'ilvoContract', label: 'ILVO', render: (c) => sourceContractCell(c, 'ilvo') },
-                { key: 'kufarContract', label: 'Kufar', render: (c) => sourceContractCell(c, 'kufar') },
                 { key: 'date', label: 'Дата', render: (c) => formatShortDate(c.date) },
                 { key: 'objTitle', label: 'Объект', render: (c) => (c.obj ? c.obj.title : '—') },
                 { key: 'objectNumber', label: '№ объекта', render: (c) => c.obj ? c.obj.objectNumber : '—' },
+                { key: 'hint', label: 'Подсказка', render: contractFormatHint },
                 {
                     key: 'status',
                     label: 'Статус',
@@ -183,7 +190,7 @@ export function renderContracts(container) {
                 }
             ],
             rows,
-            searchFields: ['number', 'siteContract', 'ilvoContract', 'kufarContract', 'date'],
+            searchFields: ['number', 'date'],
             emptyText: 'Договоры не найдены',
             initialSortKey: 'number'
         }));
