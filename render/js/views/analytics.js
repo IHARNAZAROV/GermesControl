@@ -33,7 +33,7 @@ export function renderAnalytics(container) {
     ]));
 
     container.appendChild(el('div', { class: 'card-title', style: 'margin-bottom:10px;' }, 'Состояние выгрузки'));
-    container.appendChild(el('div', { class: 'stat-grid', style: 'grid-template-columns: repeat(3, 1fr); margin-bottom:22px;' }, [
+    container.appendChild(el('div', { class: 'stat-grid stat-grid-three', style: 'margin-bottom:22px;' }, [
         tile(stats.siteCount, 'Сайт'),
         tile(stats.ilvoCount, 'ILVO'),
         tile(stats.kufarCount, 'Kufar')

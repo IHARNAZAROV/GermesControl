@@ -2,6 +2,7 @@
     display: flex;
     height: 100vh;
     width: 100vw;
+    min-width: 0;
 }
 
 /* ---------- Sidebar ---------- */
@@ -77,6 +78,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    max-width: 100%;
 }
 
 #topbar {
@@ -93,25 +95,29 @@
 
 .topbar-titles h2 { font-size: 19px; font-weight: 750; letter-spacing: -0.45px; }
 .topbar-titles p { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 3px; }
+.topbar-titles { min-width: 0; overflow-wrap: anywhere; }
 
-.topbar-actions { display: flex; align-items: center; gap: 9px; }
+.topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; min-width: 0; }
 
 .topbar-clock { text-align: right; font-size: 10.5px; color: var(--color-text-secondary); margin: 0 7px 0 11px; }
 .topbar-clock .time { font-weight: 750; color: var(--color-text); font-size: 13px; letter-spacing: 0.1px; }
 
-.topbar-user { display: flex; align-items: center; gap: 10px; padding-left: 16px; border-left: 1px solid var(--color-border); }
+.topbar-user { display: flex; align-items: center; gap: 10px; padding-left: 16px; border-left: 1px solid var(--color-border); min-width: 0; }
+.topbar-user > div:last-child { min-width: 0; }
 .topbar-user .avatar {
     width: 35px; height: 35px; border-radius: 12px;
     background: #EAE8FF; color: var(--color-primary);
     display: flex; align-items: center; justify-content: center; font-weight: 750; font-size: 12px;
 }
 .topbar-user .name { font-size: 13px; font-weight: 600; }
+.topbar-user .name, .topbar-user .role { overflow-wrap: anywhere; }
 .topbar-user .role { font-size: 11.5px; color: var(--color-text-secondary); }
 
 #view-root {
     flex: 1;
     overflow-y: auto;
     padding: 31px 34px 48px;
+    min-width: 0;
 }
 
 #modal-root {
@@ -120,6 +126,7 @@
     display: none;
     align-items: center;
     justify-content: center;
+    padding: 16px;
     background: rgba(16, 19, 43, 0.48);
     z-index: 50;
 }
@@ -144,4 +151,13 @@
     #topbar { padding: 14px 18px; }
     .topbar-clock, .topbar-user > div:last-child { display: none; }
     #view-root { padding: 24px 18px 36px; }
+}
+
+/* Target laptop viewport: keep the full navigation, but give the content
+   area and topbar enough room at the configured 1100px minimum width. */
+@media (min-width: 821px) and (max-width: 1200px) {
+    #sidebar { width: 232px; }
+    #topbar { padding: 15px 24px; gap: 12px; }
+    #topbar .btn { padding-left: 11px; padding-right: 11px; }
+    #view-root { padding: 24px 24px 36px; }
 }

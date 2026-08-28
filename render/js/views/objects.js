@@ -59,13 +59,13 @@ function showObjectDetail(obj) {
             matchBasis(obj),
             el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-top:8px;' }, 'Записи объединяются по нормализованному номеру договора и адресу. Исходные номера источников сохраняются для контроля формата.')
         ]),
-        el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-bottom:16px;' },
+        el('div', { class: 'object-detail-grid' },
             rows.map(([label, value]) => el('div', {}, [
                 el('div', { class: 'text-secondary', style: 'font-size:11.5px;' }, label),
                 el('div', { style: 'font-weight:600;font-size:13px;' }, String(value ?? '—'))
             ]))
         ),
-        el('div', { style: 'display:flex;gap:8px;margin-bottom:16px;' }, [
+        el('div', { class: 'presence-list' }, [
             presenceChip(obj.presence.site, 'Сайт'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'Сайт'),
             presenceChip(obj.presence.ilvo, 'ILVO'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'ILVO'),
             presenceChip(obj.presence.kufar, 'Kufar'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'Kufar')

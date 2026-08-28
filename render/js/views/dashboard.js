@@ -124,7 +124,7 @@ export function renderDashboard(container) {
                     el('div', { class: 'status-sub' }, 'Основные источники данных загружены')
                 ])
             ]),
-            el('div', { style: 'display:flex;align-items:center;' }, [
+            el('div', { class: 'status-actions' }, [
                 el('div', { class: 'status-time' }, [
                     el('div', {}, 'Последняя проверка:'),
                     el('div', { class: 'value' }, formatDateTime(report.checkedAt))

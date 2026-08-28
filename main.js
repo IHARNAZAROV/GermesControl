@@ -2,14 +2,16 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('./src/main/ipcHandlers');
 
+const WINDOW_DEFAULT_SIZE = { width: 1440, height: 900 };
+const WINDOW_MIN_SIZE = { width: 1100, height: 700 };
+
 let mainWindow = null;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 1440,
-        height: 900,
-        minWidth: 1100,
-        minHeight: 700,
+        ...WINDOW_DEFAULT_SIZE,
+        minWidth: WINDOW_MIN_SIZE.width,
+        minHeight: WINDOW_MIN_SIZE.height,
         backgroundColor: '#F5F6FA',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),

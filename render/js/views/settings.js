@@ -52,7 +52,7 @@ export function renderSettings(container) {
     const dataSection = el('div', { class: 'card card-pad settings-section' }, [
         el('div', { class: 'card-title' }, 'Демо-данные'),
         el('p', { class: 'card-subtitle', style: 'margin: 8px 0 14px;' }, 'Скачайте примеры файлов в ожидаемом формате или восстановите демонстрационный набор данных.'),
-        el('div', { style: 'display:flex; gap:10px;' }, [
+        el('div', { class: 'settings-actions' }, [
             el('button', {
                 class: 'btn btn-secondary',
                 onclick: async () => {

@@ -26,7 +26,7 @@ function sourceCard(key, onChanged) {
     card.appendChild(status);
     card.appendChild(el('div', { class: 'text-secondary', style: 'font-size:11.5px;' }, info.importedAt ? formatDateTime(info.importedAt) : ''));
 
-    const actions = el('div', { style: 'display:flex; gap:8px; margin-top:4px;' });
+    const actions = el('div', { class: 'import-actions' });
     actions.appendChild(el('button', {
         class: 'btn btn-secondary btn-sm',
         onclick: async () => {
