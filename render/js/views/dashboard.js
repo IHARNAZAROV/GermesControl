@@ -1,4 +1,4 @@
-import { el, formatMoney, formatDateTime, pluralize, icon, sourceLogo } from '../format.js';
+import { el, formatMoney, pluralize, icon, sourceLogo } from '../format.js';
 import { store, runCheck } from '../state.js';
 import { renderDonut } from '../components/donutChart.js';
 import { showToast } from '../components/toast.js';
@@ -135,25 +135,4 @@ export function renderDashboard(container) {
 
     container.appendChild(el('div', { class: 'grid-2' }, [donutCard, issuesCard]));
 
-    container.appendChild(
-        el('div', { class: 'card status-bar' }, [
-            el('div', { class: 'status-main' }, [
-                el('div', { class: 'status-icon' }, [icon('check', 17)]),
-                el('div', {}, [
-                    el('div', { class: 'status-title' }, 'Система работает корректно'),
-                    el('div', { class: 'status-sub' }, 'Основные источники данных загружены')
-                ])
-            ]),
-            el('div', { class: 'status-actions' }, [
-                el('div', { class: 'status-time' }, [
-                    el('div', {}, 'Последняя проверка:'),
-                    el('div', { class: 'value' }, formatDateTime(report.checkedAt))
-                ]),
-                el('button', {
-                    class: 'btn btn-primary',
-                    onclick: async () => { await runCheck(); renderDashboard(container); }
-                }, [icon('play', 15), 'Запустить проверку'])
-            ])
-        ])
-    );
 }

@@ -43,7 +43,7 @@ function renderSidebar(activeRoute) {
     sidebarEl.innerHTML = '';
     sidebarEl.appendChild(el('div', { class: 'sidebar-brand' }, [
         el('div', { class: 'brand-lockup' }, [
-            el('div', { class: 'brand-mark' }, [icon('spark', 18)]),
+            el('div', { class: 'brand-mark' }, [sourceLogo('site')]),
             el('div', {}, [
                 el('h1', {}, 'GermesControl'),
                 el('p', {}, 'Real estate intelligence')
@@ -88,12 +88,9 @@ function renderTopbar(activeRoute) {
     const item = NAV_ITEMS.find((i) => i.key === activeRoute);
     const now = new Date();
 
-    topbarEl.appendChild(el('div', { class: 'topbar-title-block' }, [
-        el('div', { class: 'topbar-site-logo' }, [sourceLogo('site')]),
-        el('div', { class: 'topbar-titles' }, [
-            el('h2', {}, item ? item.label : ''),
-            activeRoute === 'dashboard' ? el('p', {}, now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })) : null
-        ])
+    topbarEl.appendChild(el('div', { class: 'topbar-titles' }, [
+        el('h2', {}, item ? item.label : ''),
+        activeRoute === 'dashboard' ? el('p', {}, now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })) : null
     ]));
 
     const actions = el('div', { class: 'topbar-actions' }, [
