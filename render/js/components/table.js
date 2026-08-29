@@ -20,7 +20,7 @@ export function renderDataTable({
     let sortDir = initialSortDir;
     let page = 0;
 
-    const wrap = el('div', {});
+    const wrap = el('div', { class: 'filter-animated-content' });
     const toolbar = el('div', { class: 'table-toolbar' });
     const searchInput = el('input', {
         class: 'search-input',
@@ -107,6 +107,10 @@ export function renderDataTable({
         } else if (filtered.length) {
             pager.appendChild(el('span', { class: 'text-secondary', style: 'font-size:12px;' }, `Всего: ${filtered.length}`));
         }
+
+        wrap.classList.remove('filter-content-enter');
+        void wrap.offsetWidth;
+        wrap.classList.add('filter-content-enter');
     }
 
     renderBody();

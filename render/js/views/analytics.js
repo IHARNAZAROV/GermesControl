@@ -65,7 +65,7 @@ export function renderAnalytics(container) {
     metrics.forEach((m, i) => metricTabs.appendChild(
         el('span', { class: `filter-chip${i === 0 ? ' active' : ''}`, onclick: (e) => setMetric(m.key, e) }, m.label)
     ));
-    const chartHolder = el('div');
+    const chartHolder = el('div', { class: 'filter-animated-content' });
     chartCard.appendChild(el('div', { class: 'card-title' }, 'Динамика'));
     chartCard.appendChild(tabs);
     chartCard.appendChild(metricTabs);
@@ -96,6 +96,9 @@ export function renderAnalytics(container) {
             chartHolder.appendChild(el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-top:6px;text-align:right;' },
                 `${formatShortDate(series[0].date)} — ${formatShortDate(series[series.length - 1].date)}`));
         }
+        chartHolder.classList.remove('filter-content-enter');
+        void chartHolder.offsetWidth;
+        chartHolder.classList.add('filter-content-enter');
     }
 
     draw();
