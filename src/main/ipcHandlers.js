@@ -133,7 +133,7 @@ function registerIpcHandlers(getMainWindow) {
     ipcMain.handle('app:importIlvoFromApi', async () => {
         const token = String(process.env.ILVO_API_TOKEN || '').trim();
         if (!token) {
-            throw new Error('Не найден ключ ILVO API. Добавьте ILVO_API_TOKEN в Secrets проекта.');
+            throw new Error('Не найден ключ ILVO API. В Replit добавьте ILVO_API_TOKEN в Secrets, а при запуске из VS Code — в локальный файл .env.');
         }
 
         const controller = new AbortController();
