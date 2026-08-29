@@ -53,21 +53,19 @@ function barList(items, emptyText = 'Нет данных для отображе
     if (!nonEmptyItems.length) return el('div', { class: 'analytics-empty' }, emptyText);
 
     const max = Math.max(...nonEmptyItems.map((item) => item.value), 1);
-    return el('div', { class: 'analytics-bars' }, nonEmptyItems.map((item) => {
-        const width = Math.max(4, Math.round((item.value / max) * 100));
-        return el('div', { class: 'analytics-bar-row' }, [
-            el('div', { class: 'analytics-bar-header' }, [
-                el('span', { class: 'analytics-bar-label' }, [
-                    item.color ? el('span', { class: 'analytics-bar-dot', style: `background:${item.color}` }) : null,
-                    item.label
-                ]),
-                el('span', { class: 'analytics-bar-value' }, item.valueLabel || String(item.value))
-            ]),
-            el('div', { class: 'analytics-bar-track' }, [
+    return el('div', { class: 'analytics-column-chart' }, nonEmptyItems.map((item) => {
+        const height = Math.max(5, Math.round((item.value / max) * 100));
+        return el('div', { class: 'analytics-column' }, [
+            el('div', { class: 'analytics-column-value' }, item.valueLabel || String(item.value)),
+            el('div', { class: 'analytics-column-track' }, [
                 el('div', {
-                    class: 'analytics-bar-fill',
-                    style: `width:${width}%;${item.color ? `background:${item.color};` : ''}`
+                    class: 'analytics-column-fill',
+                    style: `height:${height}%;${item.color ? `background:${item.color};` : ''}`
                 })
+            ]),
+            el('div', { class: 'analytics-column-label', title: item.label }, [
+                item.color ? el('span', { class: 'analytics-column-dot', style: `background:${item.color}` }) : null,
+                el('span', {}, item.label)
             ])
         ]);
     }));
