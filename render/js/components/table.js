@@ -19,6 +19,10 @@ export function renderDataTable({
     let sortKey = initialSortKey;
     let sortDir = initialSortDir;
     let page = 0;
+    const normalizedRows = rows.map((row) => ({
+        row,
+        searchText: searchFields.map((field) => String(row[field] ?? '').toLowerCase()).join('\u0000')
+    }));
 
     const wrap = el('div', { class: 'filter-animated-content' });
     const toolbar = el('div', { class: 'table-toolbar' });
@@ -53,13 +57,11 @@ export function renderDataTable({
     const pager = el('div', { class: 'table-toolbar', style: 'justify-content:flex-end;' });
     wrap.appendChild(pager);
 
-    function matches(row) {
-        if (!query) return true;
-        return searchFields.some((f) => String(row[f] ?? '').toLowerCase().includes(query));
-    }
-
     function renderBody() {
-        let filtered = rows.filter(matches);
+        const filteredEntries = query
+            ? normalizedRows.filter((entry) => entry.searchText.includes(query))
+            : normalizedRows;
+        let filtered = filteredEntries.map((entry) => entry.row);
         if (sortKey) {
             const col = columns.find((c) => c.key === sortKey);
             filtered = filtered.slice().sort((a, b) => {
@@ -85,6 +87,7 @@ export function renderDataTable({
             tbody.appendChild(tr);
         } else {
             const pageRows = filtered.slice(page * pageSize, (page + 1) * pageSize);
+            const fragment = document.createDocumentFragment();
             pageRows.forEach((row) => {
                 const tr = el('tr');
                 columns.forEach((col) => {
@@ -94,8 +97,9 @@ export function renderDataTable({
                     else td.textContent = value;
                     tr.appendChild(td);
                 });
-                tbody.appendChild(tr);
+                fragment.appendChild(tr);
             });
+            tbody.appendChild(fragment);
         }
 
         pager.innerHTML = '';

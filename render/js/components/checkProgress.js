@@ -14,7 +14,15 @@ const STEPS = [
     'Проверка адресов'
 ];
 
+let activeRun = null;
+
+function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function runCheckWithProgress(onDone) {
+    const runToken = {};
+    activeRun = runToken;
     const stepNodes = STEPS.map((label) => el('div', { class: 'check-step' }, [
         el('span', { class: 'check-mark' }, [icon('play', 15)]),
         el('span', {}, label)
@@ -28,7 +36,8 @@ export async function runCheckWithProgress(onDone) {
     openModal({ title: 'Проверка данных', width: '420px', body });
 
     for (let i = 0; i < stepNodes.length; i++) {
-        await new Promise((r) => setTimeout(r, 180));
+        await wait(180);
+        if (activeRun !== runToken) return;
         stepNodes[i].classList.add('done');
         stepNodes[i].classList.remove('active');
         const mark = stepNodes[i].querySelector('.check-mark');
@@ -41,8 +50,11 @@ export async function runCheckWithProgress(onDone) {
     try {
         report = await runCheck();
     } catch (err) {
-        showToast(err.message || 'Ошибка при проверке данных', 'error');
-        closeModal();
+        if (activeRun === runToken) {
+            showToast(err.message || 'Ошибка при проверке данных', 'error');
+            closeModal();
+            activeRun = null;
+        }
         return;
     }
 
@@ -55,8 +67,10 @@ export async function runCheckWithProgress(onDone) {
     }
 
     setTimeout(() => {
+        if (activeRun !== runToken) return;
         closeModal();
         showToast('Проверка завершена', 'success');
         if (onDone) onDone(report);
+        activeRun = null;
     }, 900);
 }
