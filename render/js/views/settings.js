@@ -43,6 +43,10 @@ export function renderSettings(container) {
             el('label', {}, 'Ссылка на выгрузку Kufar (ILVO)'),
             el('input', { id: 'set-kufar-url', value: s.kufarXmlUrl || '' })
         ]),
+        el('div', { class: 'form-row', style: 'margin-top:14px;' }, [
+            el('label', {}, 'ILVO API'),
+            el('div', { class: 'card-subtitle' }, 'Ключ хранится в Secrets проекта и не показывается в приложении. Синхронизация выполняется кнопкой в окне «Загрузить данные».')
+        ]),
         el('button', {
             class: 'btn btn-secondary',
             onclick: async () => {

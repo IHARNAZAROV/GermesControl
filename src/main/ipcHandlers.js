@@ -5,7 +5,13 @@ const path = require('path');
 const fs = require('fs-extra');
 const dayjs = require('dayjs');
 const store = require('./dataStore');
-const { parseSiteJson, parseSiteJsonContent, parseIlvoXlsx, parseKufarXml } = require('./parsers');
+const {
+    parseSiteJson,
+    parseSiteJsonContent,
+    parseIlvoXlsx,
+    parseIlvoApiEvents,
+    parseKufarXml
+} = require('./parsers');
 const { runComparison } = require('./compare');
 const { generateReport, REPORT_LABELS } = require('./reports');
 const { SOURCES } = require('./schema');
@@ -18,6 +24,7 @@ const FILE_FILTERS = {
 
 const FORMAT_EXT = { xlsx: 'xlsx', csv: 'csv', json: 'json', pdf: 'pdf' };
 const SITE_JSON_URL = 'https://germesgarant.by/data/objects.json';
+const ILVO_EVENTS_URL = 'https://api.ilvo.pro/v1/events';
 const URL_REQUEST_TIMEOUT_MS = 30_000;
 
 function buildFullState() {
@@ -116,6 +123,67 @@ function registerIpcHandlers(getMainWindow) {
         } catch (error) {
             if (error?.name === 'AbortError') {
                 throw new Error('Kufar XML не ответил за 30 секунд. Проверьте ссылку и подключение к интернету.');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+        }
+    });
+
+    ipcMain.handle('app:importIlvoFromApi', async () => {
+        const token = String(process.env.ILVO_API_TOKEN || '').trim();
+        if (!token) {
+            throw new Error('Не найден ключ ILVO API. Добавьте ILVO_API_TOKEN в Secrets проекта.');
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), URL_REQUEST_TIMEOUT_MS);
+        try {
+            const response = await fetch(ILVO_EVENTS_URL, {
+                headers: {
+                    Accept: 'application/json',
+                    'x-token': token
+                },
+                signal: controller.signal
+            });
+            if (!response.ok) {
+                if (response.status === 403) {
+                    throw new Error('ILVO отклонил ключ API (HTTP 403). Проверьте ключ в Secrets и настройки доступа в ILVO.');
+                }
+                throw new Error(`ILVO вернул ошибку HTTP ${response.status}.`);
+            }
+
+            const jsonText = await response.text();
+            let rawEvents;
+            try {
+                rawEvents = JSON.parse(jsonText);
+            } catch (error) {
+                throw new Error(`ILVO вернул некорректный JSON: ${error.message}`);
+            }
+            const records = parseIlvoApiEvents(rawEvents);
+            if (records.length === 0) {
+                throw new Error('В ответе ILVO не найдено событий с данными объектов.');
+            }
+
+            const storedPath = store.saveRawContent('ilvo', 'events.json', jsonText);
+            store.setSourceData('ilvo', records, {
+                fileName: 'events.json (ILVO API)',
+                storedPath,
+                sourceUrl: ILVO_EVENTS_URL,
+                eventCount: Array.isArray(rawEvents) ? rawEvents.length : 0,
+                syncMode: 'api',
+                isDemo: false
+            });
+            return {
+                sourceKey: 'ilvo',
+                count: records.length,
+                eventCount: Array.isArray(rawEvents) ? rawEvents.length : 0,
+                fileName: 'events.json (ILVO API)',
+                sourceUrl: ILVO_EVENTS_URL
+            };
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                throw new Error('ILVO не ответил за 30 секунд. Проверьте ссылку и подключение к интернету.');
             }
             throw error;
         } finally {

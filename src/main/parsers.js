@@ -296,6 +296,122 @@ async function parseIlvoXlsx(filePath) {
     return records;
 }
 
+const ILVO_API_TYPES = {
+    apartment: 'Квартира',
+    room: 'Комната',
+    house: 'Дом',
+    plot: 'Участок',
+    garage: 'Гараж',
+    commercial: 'Коммерческая',
+    untyped: 'Другое'
+};
+
+function readCaseInsensitive(record, key) {
+    if (!record || typeof record !== 'object') return null;
+    const wanted = String(key).toLowerCase();
+    const found = Object.keys(record).find((candidate) => candidate.toLowerCase() === wanted);
+    return found ? record[found] : null;
+}
+
+function parseApiPrice(value) {
+    if (value === undefined || value === null || value === '') return null;
+    return toNumberOrNull(String(value).replace(/\s|\u00a0/g, ''));
+}
+
+function apiPriceByCurrency(object, currency) {
+    const normalizedCurrency = String(currency || '').trim().toUpperCase();
+    const prices = object && object.prices && typeof object.prices === 'object' ? object.prices : {};
+    const rawByCurrency = readCaseInsensitive(prices, normalizedCurrency);
+    const objectCurrency = String(object?.currency || '').trim().toUpperCase();
+    const rawPrice = rawByCurrency ?? (objectCurrency === normalizedCurrency ? object.price : null);
+    return parseApiPrice(rawPrice);
+}
+
+function buildIlvoApiAddress(object) {
+    const parts = [
+        cleanString(object.street),
+        cleanString(object.building),
+        cleanString(object.housing)
+    ].filter(Boolean);
+    return parts.length ? parts.join(', ') : null;
+}
+
+function apiEventTimestamp(event) {
+    const value = event && (event.date || event.data?.data?.modified || event.data?.data?.created);
+    const timestamp = value ? Date.parse(value) : NaN;
+    return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+/**
+ * ILVO CRM API returns an event stream rather than a flat object export.
+ * Keep the latest event for each object, then map the current event payload
+ * into the same internal shape as the XLSX importer.
+ */
+function parseIlvoApiEvents(rawEvents) {
+    const events = Array.isArray(rawEvents)
+        ? rawEvents
+        : (rawEvents && Array.isArray(rawEvents.events) ? rawEvents.events : []);
+    const latestByObject = new Map();
+
+    events.forEach((event, index) => {
+        const payload = event?.data;
+        const object = payload?.data;
+        const objectKey = object?.id ?? object?.uuid;
+        if (!payload || !object || objectKey === undefined || objectKey === null) return;
+
+        const timestamp = apiEventTimestamp(event);
+        const previous = latestByObject.get(String(objectKey));
+        if (!previous || (timestamp !== null && (previous.timestamp === null || timestamp >= previous.timestamp)) ||
+            (timestamp === null && previous.timestamp === null)) {
+            latestByObject.set(String(objectKey), { event, object, timestamp, index });
+        }
+    });
+
+    return [...latestByObject.values()]
+        .sort((a, b) => a.index - b.index)
+        .map(({ event, object }) => {
+            const action = String(event.data.action || '').toLowerCase();
+            const price = apiPriceByCurrency(object, 'BYN');
+            const priceUsd = apiPriceByCurrency(object, 'USD');
+            const type = ILVO_API_TYPES[object.type] || cleanString(object.subtype) || cleanString(object.type) || 'Другое';
+            const rooms = object.rooms ?? object.rooms_total ?? null;
+            const contract = object.contract || null;
+            const status = action === 'delete' ? 'inactive' : 'active';
+            const title = [
+                type,
+                rooms !== null && rooms !== undefined ? `${rooms}-комн.` : null,
+                object.area !== null && object.area !== undefined ? `${object.area} м²` : null,
+                cleanString(object.city)
+            ].filter(Boolean).join(', ');
+            const record = finalizeRecord({
+                id: String(object.id ?? object.uuid),
+                title: title || null,
+                type,
+                dealType: normalizeDealType(object.category),
+                city: object.city,
+                address: buildIlvoApiAddress(object),
+                price,
+                priceUsd,
+                rooms,
+                totalArea: object.area,
+                livingArea: object.area_living,
+                kitchenArea: object.area_kitchen,
+                floor: object.floor,
+                floors: object.floors_total,
+                description: object.description ?? object.public_description,
+                contractNumber: contract?.number ?? null,
+                contractDate: contract?.date ?? null,
+                status,
+                statusDate: status === 'inactive' ? event.date : null,
+                photos: object._photos
+            }, 'ilvo', `ilvo-api-${object.id ?? object.uuid}`);
+            record.ilvoApiAction = action || null;
+            record.ilvoApiEventDate = event.date || null;
+            record.ilvoApiModified = object.modified || null;
+            return record;
+        });
+}
+
 function unwrapArray(v) {
     if (v === undefined || v === null) return [];
     return Array.isArray(v) ? v : [v];
@@ -419,4 +535,11 @@ async function parseKufarXml(filePathOrContent, isRawContent) {
         .filter((r) => r.title || r.address || r.contractNumber);
 }
 
-module.exports = { parseSiteJson, parseSiteJsonContent, parseIlvoXlsx, parseKufarXml, finalizeRecord };
+module.exports = {
+    parseSiteJson,
+    parseSiteJsonContent,
+    parseIlvoXlsx,
+    parseIlvoApiEvents,
+    parseKufarXml,
+    finalizeRecord
+};

@@ -1,5 +1,5 @@
 import { el, formatDateTime, sourceLogo } from '../format.js';
-import { store, importSource, importSiteFromUrl, importKufarFromUrl } from '../state.js';
+import { store, importSource, importSiteFromUrl, importIlvoFromApi, importKufarFromUrl } from '../state.js';
 import { openModal, closeModal } from './modal.js';
 import { showToast } from './toast.js';
 
@@ -58,6 +58,34 @@ function sourceCard(key, onChanged) {
                 }
             }
         }, 'Из файла'));
+    } else if (key === 'ilvo') {
+        actions.appendChild(el('button', {
+            class: 'btn btn-primary btn-sm',
+            onclick: async () => {
+                try {
+                    showToast('Синхронизация ILVO по API...');
+                    const res = await importIlvoFromApi();
+                    showToast(`ILVO API: загружено ${res.count} объектов из ${res.eventCount} событий`, 'success');
+                    onChanged();
+                } catch (err) {
+                    showToast(err.message || 'Не удалось загрузить данные ILVO по API', 'error');
+                }
+            }
+        }, 'Синхронизировать API'));
+        actions.appendChild(el('button', {
+            class: 'btn btn-secondary btn-sm',
+            onclick: async () => {
+                try {
+                    const res = await importSource(key);
+                    if (!res.canceled) {
+                        showToast(`${meta.label}: загружено ${res.count} объектов`, 'success');
+                        onChanged();
+                    }
+                } catch (err) {
+                    showToast(err.message || 'Ошибка загрузки файла', 'error');
+                }
+            }
+        }, `Загрузить ${meta.format}`));
     } else {
         actions.appendChild(el('button', {
             class: 'btn btn-secondary btn-sm',
@@ -107,7 +135,7 @@ export function openImportModal() {
         title: 'Загрузить данные',
         width: '720px',
         body: [
-            el('p', { class: 'card-subtitle', style: 'margin-bottom:16px;' }, 'Сайт ГермесГарант обновляется по ссылке автоматически, остальные источники загружаются вручную. После обновления источников запустите проверку, чтобы обновить сводку.'),
+            el('p', { class: 'card-subtitle', style: 'margin-bottom:16px;' }, 'Сайт ГермесГарант и ILVO можно обновить по API, а остальные источники загружаются вручную. После обновления источников запустите проверку, чтобы обновить сводку.'),
             grid
         ],
         footer: [el('button', { class: 'btn btn-secondary', onclick: closeModal }, 'Закрыть')]
