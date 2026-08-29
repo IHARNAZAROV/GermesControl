@@ -151,6 +151,30 @@ function errorAction(error) {
     return 'Проверьте исходные данные и повторно запустите проверку после исправления.';
 }
 
+function errorColumns(report, includeType = true) {
+    const columns = [
+        { key: 'description', label: 'Описание' },
+        { key: 'target', label: 'Объект / Договор', render: (error) => targetLabel(error, report) },
+        { key: 'source', label: 'Источник' },
+        { key: 'date', label: 'Дата проверки' },
+        { key: 'severity', label: 'Важность', render: (e) => severityBadge(e.severity) },
+        {
+            key: 'status',
+            label: 'Статус',
+            render: (error) => error.status === 'open'
+                ? el('button', {
+                    class: 'badge badge-neutral error-status-trigger',
+                    title: 'Открыть пояснение ошибки',
+                    'aria-label': 'Открыть пояснение ошибки',
+                    onclick: () => openErrorDetails(error, report)
+                }, 'Открыта')
+                : el('span', { class: 'badge badge-success' }, 'Исправлена')
+        }
+    ];
+    if (includeType) columns.unshift({ key: 'type', label: 'Тип' });
+    return columns;
+}
+
 function openErrorDetails(error, report) {
     const object = findErrorObject(error, report);
     const contract = findErrorContract(error, report);
@@ -230,6 +254,8 @@ export function renderErrors(container) {
 
     const errors = report.errors;
     let activeTab = 'all';
+    let viewMode = 'grouped';
+    let query = '';
     const tabs = el('div', { class: 'errors-tabs' }, [
         el('span', { class: 'filter-chip active', onclick: (e) => setTab('all', e) }, `Все (${errors.length})`),
         el('span', { class: 'filter-chip', onclick: (e) => setTab('critical', e) }, `Критические (${errors.filter((x) => x.severity === 'critical').length})`),
@@ -237,45 +263,105 @@ export function renderErrors(container) {
         el('span', { class: 'filter-chip', onclick: (e) => setTab('info', e) }, `Информационные (${errors.filter((x) => x.severity === 'info').length})`)
     ]);
 
+    const viewControls = el('div', { class: 'errors-view-controls' }, [
+        el('span', { class: 'errors-view-label' }, 'Показывать:'),
+        el('button', {
+            type: 'button',
+            class: 'filter-chip errors-view-mode active',
+            'aria-pressed': 'true',
+            onclick: (e) => setViewMode('grouped', e)
+        }, 'По типу'),
+        el('button', {
+            type: 'button',
+            class: 'filter-chip errors-view-mode',
+            'aria-pressed': 'false',
+            onclick: (e) => setViewMode('list', e)
+        }, 'Единым списком')
+    ]);
+    const searchInput = el('input', {
+        class: 'search-input errors-search-input',
+        placeholder: 'Поиск по ошибкам...',
+        oninput: (e) => { query = e.target.value.toLowerCase(); draw(); }
+    });
     const tableHolder = el('div');
-    container.appendChild(el('div', { class: 'card card-pad' }, [tabs, tableHolder]));
+    container.appendChild(el('div', { class: 'card card-pad' }, [
+        tabs,
+        viewControls,
+        el('div', { class: 'errors-search' }, [searchInput]),
+        tableHolder
+    ]));
 
     function setTab(t, e) {
         activeTab = t;
         tabs.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
-        e.target.classList.add('active');
+        e.currentTarget.classList.add('active');
         draw();
+    }
+
+    function setViewMode(mode, e) {
+        viewMode = mode;
+        viewControls.querySelectorAll('.errors-view-mode').forEach((button) => {
+            const isActive = button === e.currentTarget;
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-pressed', String(isActive));
+        });
+        draw();
+    }
+
+    function matchesQuery(error) {
+        if (!query) return true;
+        return [
+            error.type,
+            error.description,
+            error.target,
+            targetLabel(error, report),
+            error.source,
+            error.date,
+            error.status
+        ].some((value) => String(value ?? '').toLowerCase().includes(query));
+    }
+
+    function groupedRows(rows) {
+        const groups = new Map();
+        rows.forEach((error) => {
+            const type = error.type || 'Другие ошибки';
+            if (!groups.has(type)) groups.set(type, []);
+            groups.get(type).push(error);
+        });
+        return Array.from(groups.entries())
+            .sort(([first], [second]) => first.localeCompare(second, 'ru'))
+            .map(([type, groupRows]) => el('section', { class: 'error-group' }, [
+                el('div', { class: 'error-group-header' }, [
+                    el('div', { class: 'error-group-title' }, type),
+                    el('span', { class: 'badge badge-neutral' }, `${groupRows.length}`)
+                ]),
+                renderDataTable({
+                    columns: errorColumns(report, false),
+                    rows: groupRows,
+                    pageSize: 50,
+                    emptyText: 'Ошибок не найдено'
+                })
+            ]));
     }
 
     function draw() {
         let rows = errors;
         if (activeTab !== 'all') rows = rows.filter((x) => x.severity === activeTab);
+        rows = rows.filter(matchesQuery);
         tableHolder.innerHTML = '';
-        tableHolder.appendChild(renderDataTable({
-            columns: [
-                { key: 'type', label: 'Тип' },
-                { key: 'description', label: 'Описание' },
-                { key: 'target', label: 'Объект / Договор', render: (error) => targetLabel(error, report) },
-                { key: 'source', label: 'Источник' },
-                { key: 'date', label: 'Дата проверки' },
-                { key: 'severity', label: 'Важность', render: (e) => severityBadge(e.severity) },
-                 {
-                     key: 'status',
-                     label: 'Статус',
-                     render: (error) => error.status === 'open'
-                         ? el('button', {
-                             class: 'badge badge-neutral error-status-trigger',
-                             title: 'Открыть пояснение ошибки',
-                             'aria-label': 'Открыть пояснение ошибки',
-                             onclick: () => openErrorDetails(error, report)
-                         }, 'Открыта')
-                         : el('span', { class: 'badge badge-success' }, 'Исправлена')
-                 }
-            ],
-            rows,
-            searchFields: ['type', 'description', 'target', 'source'],
-            emptyText: 'Ошибок не найдено'
-        }));
+        if (viewMode === 'grouped') {
+            const groups = groupedRows(rows);
+            tableHolder.appendChild(el('div', { class: 'error-groups' }, groups.length
+                ? groups
+                : [el('div', { class: 'table-empty' }, 'Ошибок не найдено')]));
+        } else {
+            tableHolder.appendChild(renderDataTable({
+                columns: errorColumns(report),
+                rows,
+                pageSize: 50,
+                emptyText: 'Ошибок не найдено'
+            }));
+        }
     }
 
     draw();

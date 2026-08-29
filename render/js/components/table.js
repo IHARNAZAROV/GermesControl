@@ -28,7 +28,7 @@ export function renderDataTable({
         oninput: (e) => { query = e.target.value.toLowerCase(); page = 0; renderBody(); }
     });
     if (searchFields.length) toolbar.appendChild(searchInput);
-    wrap.appendChild(toolbar);
+    if (searchFields.length) wrap.appendChild(toolbar);
 
     const tableWrap = el('div', { class: 'table-wrap' });
     const table = el('table', { class: 'data-table' });
