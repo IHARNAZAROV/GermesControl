@@ -8,11 +8,12 @@ const {
     extractContractKey,
     extractContractDate,
     normalizeAddressKey,
-    cleanLocationText
+    cleanLocationText,
+    normalizeDealType
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 9;
+const REPORT_MATCHING_VERSION = 10;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -31,15 +32,41 @@ function isSubsetMatch(a, b) {
     return true;
 }
 
+function hasAddressNumber(value) {
+    return /\d/.test(String(value || ''));
+}
+
+function compactContains(a, b) {
+    const compactA = a.replace(/\s+/g, '');
+    const compactB = b.replace(/\s+/g, '');
+    if (!compactA || !compactB) return false;
+
+    const shorter = compactA.length <= compactB.length ? compactA : compactB;
+    const longer = compactA.length <= compactB.length ? compactB : compactA;
+    const index = longer.indexOf(shorter);
+    if (index < 0) return false;
+
+    // Не допускаем «дом 1» внутри «дом 10» и аналогичные совпадения.
+    const word = /[0-9A-Za-zА-Яа-яЁё]/u;
+    const before = index === 0 || !word.test(longer[index - 1]);
+    const afterIndex = index + shorter.length;
+    const after = afterIndex === longer.length || !word.test(longer[afterIndex]);
+    return before && after;
+}
+
 function fieldsDiffer(a, b, field) {
-    if (a === null || b === null || a === undefined || b === undefined) return false;
-    if (a === null || b === null) return false;
+    // Отсутствующее поле не является расхождением: его нельзя сравнивать
+    // с фактическим значением и нельзя выдавать догадку за ошибку.
+    if (!hasRecordValue(a) || !hasRecordValue(b)) return false;
     if (field.numeric) {
         const na = Number(a), nb = Number(b);
         if (!Number.isFinite(na) || !Number.isFinite(nb)) return false;
         // допускаем небольшую погрешность округления (0.5%)
         const tolerance = Math.max(1, Math.abs(na) * 0.005);
         return Math.abs(na - nb) > tolerance;
+    }
+    if (field.key === 'dealType') {
+        return normalizeDealType(a) !== normalizeDealType(b);
     }
     if (field.key === 'address') {
         const ca = cleanLocationText(a);
@@ -49,9 +76,7 @@ function fieldsDiffer(a, b, field) {
         if (isSubsetMatch(ta, tb)) return false;
         // Тот же адрес, но с иным пробелом внутри номера дома/корпуса
         // (например, "16к2" против "16к 2") — сравниваем без пробелов вовсе.
-        const da = ca.replace(/\s+/g, '');
-        const db = cb.replace(/\s+/g, '');
-        if (da && db && (da.includes(db) || db.includes(da))) return false;
+        if (hasAddressNumber(ca) && hasAddressNumber(cb) && compactContains(ca, cb)) return false;
         return true;
     }
     return String(a).trim().toLowerCase() !== String(b).trim().toLowerCase();
@@ -252,11 +277,25 @@ function numericValuesMatch(a, b, tolerance = 0.01) {
  */
 function descriptorMatches(a, b) {
     if (!pricesMatch(a, b)) return false;
-    const propertyChecks = [
-        normalizedComparableText(a.type) && normalizedComparableText(a.type) === normalizedComparableText(b.type),
-        numericValuesMatch(a.rooms, b.rooms, 0),
-        numericValuesMatch(a.totalArea, b.totalArea, 0.01)
-    ].filter(Boolean);
+    const attributes = [
+        {
+            available: hasRecordValue(a.type) && hasRecordValue(b.type),
+            matches: normalizedComparableText(a.type) === normalizedComparableText(b.type)
+        },
+        {
+            available: hasRecordValue(a.rooms) && hasRecordValue(b.rooms),
+            matches: numericValuesMatch(a.rooms, b.rooms, 0)
+        },
+        {
+            available: hasRecordValue(a.totalArea) && hasRecordValue(b.totalArea),
+            matches: numericValuesMatch(a.totalArea, b.totalArea, 0.01)
+        }
+    ];
+    // Резервное сопоставление нельзя использовать, если хотя бы один
+    // заполненный сильный признак противоречит другому источнику. Иначе
+    // два объекта с одной ценой и похожей площадью склеиваются в один.
+    if (attributes.some((attribute) => attribute.available && !attribute.matches)) return false;
+    const propertyChecks = attributes.filter((attribute) => attribute.available && attribute.matches);
     // Город может быть районом в одном источнике и населённым пунктом в
     // другом, а тип сделки не идентифицирует саму недвижимость. Поэтому
     // они не считаются сильными признаками для объединения.
@@ -277,8 +316,9 @@ function addressMatches(a, b) {
     // запись улицы относительно полного адреса.
     const compactA = addressA.replace(/\s+/g, '');
     const compactB = addressB.replace(/\s+/g, '');
-    return compactA.length > 0 && compactB.length > 0
-        && (compactA.includes(compactB) || compactB.includes(compactA));
+    return hasAddressNumber(addressA)
+        && hasAddressNumber(addressB)
+        && compactContains(addressA, addressB);
 }
 
 /**
@@ -380,7 +420,11 @@ const MISMATCH_TYPE_BY_FIELD = {
     livingArea: ERROR_TYPES.AREA_MISMATCH,
     kitchenArea: ERROR_TYPES.AREA_MISMATCH,
     address: ERROR_TYPES.ADDRESS_MISMATCH,
-    rooms: ERROR_TYPES.ROOMS_MISMATCH
+    rooms: ERROR_TYPES.ROOMS_MISMATCH,
+    type: ERROR_TYPES.TYPE_MISMATCH,
+    dealType: ERROR_TYPES.DEAL_TYPE_MISMATCH,
+    floor: ERROR_TYPES.FLOOR_MISMATCH,
+    floors: ERROR_TYPES.FLOORS_MISMATCH
 };
 
 /**
@@ -422,8 +466,10 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         const i = group.records.ilvo || null;
         const k = group.records.kufar || null;
         const presence = { site: !!s, ilvo: !!i, kufar: !!k };
-        const soldRecords = [s, i, k].filter((record) => record?.status === 'sold');
-        const soldRecord = soldRecords[0] || null;
+        // Только статус сайта определяет, снят ли объект с продажи. ILVO
+        // и Kufar не являются источником истины для этого жизненного цикла.
+        const soldRecord = s?.status === 'sold' ? s : null;
+        const soldRecords = soldRecord ? [soldRecord] : [];
         const listingStatus = soldRecord ? 'sold' : 'active';
         const listingStatusDate = soldRecords.map((record) => record.statusDate).find(hasRecordValue) || null;
         const primary = s || i || k;
@@ -476,14 +522,20 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         if (!contractNumber && presentSourcesCount > 0) {
             pushError(ERROR_TYPES.NO_CONTRACT, 'У объекта не указан номер договора', target, presence.site ? 'Сайт' : (presence.ilvo ? 'ILVO' : 'Kufar'));
         }
-        // Расхождение номера договора между источниками (сопоставлено по адресу,
-        // но номера договоров не совпадают или указаны не везде).
+        // Расхождение номера договора между источниками: номера не совпадают
+        // либо номер указан только в части источников.
         const contractValues = [s, i, k].filter(Boolean).map(recordContractKey).filter(Boolean);
         const uniqueContracts = new Set(contractValues);
-        if (uniqueContracts.size > 1) {
+        const hasMissingContractInGroup = presentSourcesCount > 1
+            && contractValues.length > 0
+            && contractValues.length < presentSourcesCount;
+        if (uniqueContracts.size > 1 || hasMissingContractInGroup) {
+            const description = uniqueContracts.size > 1
+                ? 'Номер договора отличается между источниками'
+                : 'Номер договора указан не во всех источниках';
             pushError(
                 ERROR_TYPES.CONTRACT_MISMATCH,
-                'Номер договора отличается между источниками',
+                description,
                 target,
                 contractSourceLabel({ site: recordContractNumber(s), ilvo: recordContractNumber(i), kufar: recordContractNumber(k) })
             );

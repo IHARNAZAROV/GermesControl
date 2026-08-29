@@ -3,7 +3,13 @@
 const fs = require('fs-extra');
 const XLSX = require('xlsx');
 const { XMLParser } = require('fast-xml-parser');
-const { OBJECT_FIELDS, extractContractKey, extractContractDate, normalizeAddressKey } = require('./schema');
+const {
+    OBJECT_FIELDS,
+    extractContractKey,
+    extractContractDate,
+    normalizeAddressKey,
+    normalizeDealType
+} = require('./schema');
 
 const NUMERIC_KEYS = new Set(OBJECT_FIELDS.filter((f) => f.numeric).map((f) => f.key));
 
@@ -92,7 +98,9 @@ function parseSiteJsonData(raw) {
             id: o.id || o.slug || null,
             title: o.title || null,
             type: o.type || null,
-            dealType: o.dealType || null,
+            dealType: normalizeDealType(
+                o.dealType ?? o.deal_type ?? o['Тип сделки'] ?? o['Тип операции']
+            ),
             city: o.city || null,
             address: o.address || null,
             price: o.priceBYN ?? o.price ?? null,
@@ -198,8 +206,32 @@ function extractFloorFromText(text) {
     return extractNumberNear(text, /(\d+)[-\s]?(?:м|-м|-ом)?\s*этаже/i);
 }
 
-function extractDealType(text) {
-    return text && /аренд/i.test(text) ? 'Аренда' : 'Продажа';
+function readRowValue(row, aliases) {
+    const values = new Map(Object.entries(row || {}).map(([key, value]) => [
+        String(key).trim().toLowerCase(),
+        value
+    ]));
+    for (const alias of aliases) {
+        const value = values.get(String(alias).trim().toLowerCase());
+        if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+    }
+    return null;
+}
+
+function extractIlvoDealType(row) {
+    // Берём только явные колонки сделки. Описание намеренно не проверяем:
+    // упоминание аренды в свободном тексте не означает тип текущей сделки.
+    return normalizeDealType(readRowValue(row, [
+        'dealType',
+        'deal_type',
+        'Тип сделки',
+        'Тип операции',
+        'Вид сделки',
+        'Вид операции',
+        'Операция',
+        'Продажа/аренда',
+        'Продажа / аренда'
+    ]));
 }
 
 function buildIlvoAddress(row) {
@@ -238,7 +270,7 @@ async function parseIlvoXlsx(filePath) {
                 id: null,
                 title: null,
                 type: sheetName,
-                dealType: extractDealType(desc),
+                dealType: extractIlvoDealType(row),
                 city: row['Город'] || null,
                 address: buildIlvoAddress(row),
                 price: row['Цена'] ?? null,
@@ -348,7 +380,7 @@ async function parseKufarXml(filePathOrContent, isRawContent) {
                     id: cleanString(item.unid),
                     title: subject,
                     type,
-                    dealType: item.type === 'rent' ? 'Аренда' : 'Продажа',
+                    dealType: normalizeDealType(item.type),
                     city: fromTag.city || fromSubject.city || null,
                     address: fromTag.address || fromSubject.address || null,
                     price: currency === 'USD' ? null : price,

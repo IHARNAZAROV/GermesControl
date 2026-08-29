@@ -74,6 +74,33 @@ so the price discrepancy is reported inside one object.
 **How to apply:** keep price-only pairs separate; allow address matches with
 different prices so price mismatches remain visible to the comparison report.
 
+## Deal type provenance
+`dealType` must come from an explicit source field only. In particular, an ILVO
+description is free text and may mention аренда without describing the current
+deal; missing deal type remains null and is not a mismatch.
+
+**Why:** inferring `Аренда` from any occurrence of a word in `Описание` created
+false discrepancies, while defaulting missing values to `Продажа` fabricated
+data during imports.
+
+**How to apply:** accept explicit deal columns/keys such as `dealType`,
+`Тип сделки`, or `Операция`; normalize their Russian/English values, but never
+scan descriptions or silently default an absent value.
+
+## Descriptor fallback safety
+The price-plus-attributes fallback may join records only when the prices match,
+at least two strong attributes are available and all available strong
+attributes agree. A known conflict in type, rooms, or total area blocks the
+fallback.
+
+**Why:** two unrelated listings can have similar prices and areas; allowing a
+partial attribute match pulled a different object into an existing group and
+created several downstream false errors.
+
+**How to apply:** treat contract as the primary key and address as the normal
+fallback; use descriptors only as a conservative last resort with conflict
+rejection.
+
 ## Duplicate presentation keys
 The normalized contract key is also the deduplication key for repeated rows
 inside one source and for the contract registry itself. A source/reference ID

@@ -43,6 +43,10 @@ const ERROR_TYPES = {
     ROOMS_MISMATCH: 'Разное количество комнат',
     CONTRACT_MISMATCH: 'Разные данные договора',
     CONTRACT_FORMAT_MISMATCH: 'Разные разделители номера договора',
+    TYPE_MISMATCH: 'Разный тип объекта',
+    DEAL_TYPE_MISMATCH: 'Разный тип сделки',
+    FLOOR_MISMATCH: 'Разный этаж',
+    FLOORS_MISMATCH: 'Разная этажность',
     OTHER: 'Другие несоответствия'
 };
 
@@ -65,8 +69,36 @@ const ERROR_SEVERITY = {
     [ERROR_TYPES.ROOMS_MISMATCH]: SEVERITY.INFO,
     [ERROR_TYPES.CONTRACT_MISMATCH]: SEVERITY.CRITICAL,
     [ERROR_TYPES.CONTRACT_FORMAT_MISMATCH]: SEVERITY.INFO,
+    [ERROR_TYPES.TYPE_MISMATCH]: SEVERITY.WARNING,
+    [ERROR_TYPES.DEAL_TYPE_MISMATCH]: SEVERITY.WARNING,
+    [ERROR_TYPES.FLOOR_MISMATCH]: SEVERITY.INFO,
+    [ERROR_TYPES.FLOORS_MISMATCH]: SEVERITY.INFO,
     [ERROR_TYPES.OTHER]: SEVERITY.INFO
 };
+
+/**
+ * Нормализует только явно переданный тип сделки. Важно не выводить его
+ * из описания объекта: слова «аренда» там могут относиться к соседнему
+ * тексту и не являются значением поля сделки.
+ */
+function normalizeDealType(raw) {
+    if (raw === undefined || raw === null) return null;
+    const value = String(raw).replace(/\u00a0/g, ' ').trim();
+    if (!value || value === '-' || value === '—') return null;
+
+    const normalized = value
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/ё/g, 'е')
+        .replace(/\s+/g, ' ');
+    const firstToken = normalized.split(/[^0-9a-zа-я]+/iu)[0] || '';
+
+    // Не используем \b: JavaScript считает кириллицу не-словом и
+    // «Аренда»/«Продажа» не проходят границу слова после корня.
+    if (/^(?:аренд|сдач|снять|rent|lease)/iu.test(firstToken)) return 'Аренда';
+    if (/^(?:продаж|продать|купить|sale|sell)/iu.test(firstToken)) return 'Продажа';
+    return value;
+}
 
 /**
  * Извлекает нормализованный «ключ договора» из произвольного текста
@@ -155,6 +187,7 @@ module.exports = {
     ERROR_TYPES,
     SEVERITY,
     ERROR_SEVERITY,
+    normalizeDealType,
     extractContractKey,
     extractContractDate,
     normalizeAddressKey,
