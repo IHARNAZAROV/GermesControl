@@ -171,7 +171,7 @@ function renderHeaderSummary(report) {
     if (report?.stats) {
         nodes.push(
             el('span', { class: 'topbar-stat' }, `${report.stats.totalUnique} объектов`),
-            el('span', { class: 'topbar-stat topbar-stat-danger' }, `${report.stats.problemsCount} проблем`)
+            el('span', { class: 'topbar-stat topbar-stat-danger' }, `${report.stats.problemsCount} объектов требуют внимания`)
         );
     } else {
         nodes.push(el('span', { class: 'topbar-stat' }, 'Проверка не запускалась'));
