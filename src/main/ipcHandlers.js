@@ -103,13 +103,24 @@ function registerIpcHandlers(getMainWindow) {
 
     ipcMain.handle('app:importKufarFromUrl', async (evt, url) => {
         const targetUrl = url || store.settings.get('kufarXmlUrl');
-        const response = await fetch(targetUrl);
-        if (!response.ok) throw new Error(`Не удалось загрузить XML (${response.status})`);
-        const xmlText = await response.text();
-        const records = await parseKufarXml(xmlText, true);
-        const storedPath = store.saveRawContent('kufar', 'kufar-feed.xml', xmlText);
-        store.setSourceData('kufar', records, { fileName: 'kufar-feed.xml (URL)', storedPath, isDemo: false });
-        return { count: records.length, fileName: 'kufar-feed.xml' };
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), URL_REQUEST_TIMEOUT_MS);
+        try {
+            const response = await fetch(targetUrl, { signal: controller.signal });
+            if (!response.ok) throw new Error(`Не удалось загрузить XML (${response.status})`);
+            const xmlText = await response.text();
+            const records = await parseKufarXml(xmlText, true);
+            const storedPath = store.saveRawContent('kufar', 'kufar-feed.xml', xmlText);
+            store.setSourceData('kufar', records, { fileName: 'kufar-feed.xml (URL)', storedPath, isDemo: false });
+            return { count: records.length, fileName: 'kufar-feed.xml' };
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                throw new Error('Kufar XML не ответил за 30 секунд. Проверьте ссылку и подключение к интернету.');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+        }
     });
 
     ipcMain.handle('app:runCheck', async () => {
