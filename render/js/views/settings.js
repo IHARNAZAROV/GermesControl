@@ -3,7 +3,7 @@ import { store, loadState, resetSampleData } from '../state.js';
 import { showToast } from '../components/toast.js';
 
 const APP_VERSION = '1.0.0';
-const APP_AUTHOR = 'АН «ГермесГарант»';
+const APP_AUTHOR = 'INazarov';
 const SITE_JSON_URL = 'https://germesgarant.by/data/objects.json';
 
 const APP_DESCRIPTION = [
