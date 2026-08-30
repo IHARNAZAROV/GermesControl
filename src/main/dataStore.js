@@ -14,6 +14,7 @@ const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 const HISTORY_LIMIT = 200;
 const UPLOAD_RETENTION_LIMIT = 5;
 const SOURCE_KEYS = ['site', 'ilvo', 'kufar'];
+let stateCache = null;
 
 const settings = new Store({
     name: 'settings',
@@ -82,10 +83,15 @@ function seedInitialState() {
         contracts: sample.contracts
     };
     fs.writeJsonSync(STATE_FILE, state, { spaces: 2 });
+    stateCache = state;
     return state;
 }
 
 function getState() {
+    // Electron's main process is the single writer for this file. Keep the
+    // parsed state in memory; all mutations go through saveState below.
+    if (stateCache) return stateCache;
+
     ensureDirs();
     if (!fs.existsSync(STATE_FILE)) {
         const state = seedInitialState();
@@ -94,6 +100,7 @@ function getState() {
     }
     try {
         const state = fs.readJsonSync(STATE_FILE);
+        stateCache = state;
         pruneAllUploadedFiles(state);
         return state;
     } catch (e) {
@@ -106,6 +113,7 @@ function getState() {
 function saveState(state) {
     ensureDirs();
     fs.writeJsonSync(STATE_FILE, state, { spaces: 2 });
+    stateCache = state;
 }
 
 function setSourceData(sourceKey, records, meta) {
@@ -187,6 +195,7 @@ function appendHistory(entry) {
 
 function resetToSampleData() {
     ensureDirs();
+    stateCache = null;
     fs.removeSync(STATE_FILE);
     fs.removeSync(REPORT_FILE);
     fs.removeSync(HISTORY_FILE);
