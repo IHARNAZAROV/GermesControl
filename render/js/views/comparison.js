@@ -7,6 +7,10 @@ function chip(present) {
 }
 
 function listingBadge(object) {
+    if (object.listingStatus === 'inactive') {
+        const date = object.listingStatusDate ? ` · ${formatShortDate(object.listingStatusDate)}` : '';
+        return el('span', { class: 'badge badge-warning' }, `Неактивен в ILVO${date}`);
+    }
     if (object.listingStatus !== 'sold') return el('span', { class: 'text-secondary' }, 'Активен');
     const date = object.listingStatusDate ? ` · ${formatShortDate(object.listingStatusDate)}` : '';
     return el('span', { class: 'badge badge-warning' }, `Снят с продажи${date}`);
@@ -24,7 +28,7 @@ function categoryIcon(sources) {
 export function renderComparison(container) {
     container.innerHTML = '';
     container.appendChild(el('div', { class: 'page-title' }, 'Сравнение площадок'));
-    container.appendChild(el('div', { class: 'page-subtitle' }, 'Какие объекты потерялись при передаче данных между системами. Снятые с продажи учитываются отдельно и не считаются пропущенными.'));
+    container.appendChild(el('div', { class: 'page-subtitle' }, 'Какие объекты потерялись при передаче данных между системами. Снятые с продажи и неактивные записи ILVO учитываются отдельно и не считаются пропущенными.'));
 
     const report = store.report;
     if (!report) {
@@ -41,7 +45,8 @@ export function renderComparison(container) {
         { label: 'Нет на сайте', value: cat.missingSite, sources: ['site'] },
         { label: 'Нет в ILVO', value: cat.missingIlvo, sources: ['ilvo'] },
         { label: 'Нет в Kufar', value: cat.missingKufar, sources: ['kufar'] },
-        { label: 'Сняты с продажи', value: report.stats.soldCount || 0, sources: [] }
+        { label: 'Сняты с продажи', value: report.stats.soldCount || 0, sources: [] },
+        { label: 'Неактивны в ILVO', value: report.stats.inactiveCount || 0, sources: ['ilvo'] }
     ];
     container.appendChild(el('div', { class: 'cat-grid' }, cards.map(({ label, value, sources }) =>
         el('div', { class: 'card cat-card' }, [

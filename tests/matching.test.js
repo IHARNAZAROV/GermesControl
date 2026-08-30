@@ -211,3 +211,21 @@ test('different house numbers are not merged through compact substring matching'
     });
     assert.equal(report.objects.length, 2);
 });
+
+test('inactive ILVO records do not create missing active listing errors', () => {
+    const report = runComparison({
+        site: [record('site', { contractNumber: '38/1' })],
+        ilvo: [record('ilvo', { contractNumber: '38/1', status: 'inactive' })],
+        kufar: [],
+        contracts: [],
+        includeContractRegistry: false
+    });
+
+    assert.equal(report.objects.length, 1);
+    assert.equal(report.objects[0].listingStatus, 'inactive');
+    assert.equal(report.objects[0].status, 'ok');
+    assert.equal(report.stats.activeCount, 0);
+    assert.equal(report.stats.inactiveCount, 1);
+    assert.equal(report.categories.missingKufar, 0);
+    assert.equal(report.errors.some((error) => error.type === ERROR_TYPES.MISSING_KUFAR), false);
+});

@@ -158,6 +158,10 @@ function hasRecordValue(value) {
         && !(typeof value === 'string' && ['-', '—'].includes(value.trim()));
 }
 
+function listingStatusPriority(status) {
+    return { active: 0, inactive: 1, sold: 2 }[status] || 0;
+}
+
 /**
  * Свернуть повторные строки внутри одного источника до сопоставления
  * источников между собой. В выгрузках ILVO один объект может встречаться
@@ -197,7 +201,7 @@ function collapseSourceDuplicates(records) {
                 existing[key] = incoming;
             } else if (key === 'description' && String(incoming || '').length > String(current || '').length) {
                 existing[key] = incoming;
-            } else if (key === 'status' && incoming === 'sold') {
+            } else if (key === 'status' && listingStatusPriority(incoming) > listingStatusPriority(current)) {
                 existing[key] = incoming;
             }
         }
@@ -466,12 +470,14 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         const i = group.records.ilvo || null;
         const k = group.records.kufar || null;
         const presence = { site: !!s, ilvo: !!i, kufar: !!k };
-        // Только статус сайта определяет, снят ли объект с продажи. ILVO
-        // и Kufar не являются источником истины для этого жизненного цикла.
+        // Статус sold на сайте определяет снятие объекта с продажи. Для
+        // ILVO API отдельный inactive означает, что запись удалена/неактивна
+        // в CRM, поэтому её не следует считать активным пропуском на площадке.
         const soldRecord = s?.status === 'sold' ? s : null;
-        const soldRecords = soldRecord ? [soldRecord] : [];
-        const listingStatus = soldRecord ? 'sold' : 'active';
-        const listingStatusDate = soldRecords.map((record) => record.statusDate).find(hasRecordValue) || null;
+        const inactiveRecord = !soldRecord && i?.status === 'inactive' ? i : null;
+        const lifecycleRecords = [soldRecord, inactiveRecord].filter(Boolean);
+        const listingStatus = soldRecord ? 'sold' : inactiveRecord ? 'inactive' : 'active';
+        const listingStatusDate = lifecycleRecords.map((record) => record.statusDate).find(hasRecordValue) || null;
         const primary = s || i || k;
         const objectNumber = objSeq;
         const id = `MATCH-${String(objSeq++).padStart(4, '0')}`;
@@ -565,13 +571,13 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             }
         }
 
-        if (presentSourcesCount > 1 && !soldRecord) {
+        if (presentSourcesCount > 1 && listingStatus === 'active') {
             if (!presence.site) pushError(ERROR_TYPES.MISSING_SITE, 'Объект есть в других источниках, но отсутствует на сайте', target, presence.ilvo ? 'ILVO' : 'Kufar');
             if (!presence.ilvo) pushError(ERROR_TYPES.MISSING_ILVO, 'Объект есть в других источниках, но отсутствует в ILVO', target, presence.site ? 'Сайт' : 'Kufar');
             if (!presence.kufar) pushError(ERROR_TYPES.MISSING_KUFAR, 'Объект есть в других источниках, но отсутствует в Kufar', target, presence.site ? 'Сайт' : 'ILVO');
         }
 
-        const hasMissingSource = presentSourcesCount < 3;
+        const hasMissingSource = listingStatus === 'active' && presentSourcesCount < 3;
         let status = hasMissingSource ? 'missing' : 'ok';
         // Любая ошибка, относящаяся к этой карточке, должна отражаться
         // в её статусе, а не только расхождения полей из COMPARABLE_FIELDS.
@@ -714,7 +720,9 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
     }
 
     const total = objects.length;
-    const activeObjects = objects.filter((o) => o.listingStatus !== 'sold');
+    const activeObjects = objects.filter((o) => o.listingStatus === 'active');
+    const soldObjects = objects.filter((o) => o.listingStatus === 'sold');
+    const inactiveObjects = objects.filter((o) => o.listingStatus === 'inactive');
     const everywhere = activeObjects.filter((o) => o.presence.site && o.presence.ilvo && o.presence.kufar).length;
     const categories = {
         everywhere,
@@ -738,7 +746,8 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         warningCount: errors.filter((e) => e.severity === 'warning').length,
         infoCount: errors.filter((e) => e.severity === 'info').length,
         activeCount: activeObjects.length,
-        soldCount: objects.length - activeObjects.length,
+        soldCount: soldObjects.length,
+        inactiveCount: inactiveObjects.length,
         withContract: objects.filter((o) => !!o.contractNumber).length,
         withoutContract: objects.filter((o) => !o.contractNumber).length
     };

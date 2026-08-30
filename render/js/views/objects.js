@@ -15,6 +15,13 @@ function statusBadge(status, listingStatus, listingStatusDate) {
             title: listingStatusDate ? `Дата снятия с продажи: ${formatShortDate(listingStatusDate)}` : 'Объект продан'
         }, `Снят с продажи${date}`);
     }
+    if (listingStatus === 'inactive') {
+        const date = listingStatusDate ? ` · ${formatShortDate(listingStatusDate)}` : '';
+        return el('span', {
+            class: 'badge badge-warning',
+            title: listingStatusDate ? `Дата деактивации в ILVO: ${formatShortDate(listingStatusDate)}` : 'Запись неактивна в ILVO'
+        }, `Неактивен в ILVO${date}`);
+    }
     if (status === 'ok') return el('span', { class: 'badge badge-success' }, '\u2713 ок');
     if (status === 'missing') return el('span', { class: 'badge badge-danger' }, '\u00D7 отсутствует');
     return el('span', { class: 'badge badge-warning' }, '\u26A0 расхождение');
@@ -89,7 +96,9 @@ function showObjectDetail(obj) {
         ['Площадь кухни', formatMoney(obj.kitchenArea, 'м²')],
         ['Этаж', `${obj.floor ?? '—'} / ${obj.floors ?? '—'}`],
         ['Договор', obj.contractNumber || '—'],
-        ['Статус размещения', obj.listingStatus === 'sold' ? 'Снят с продажи' : 'Активен'],
+        ['Статус размещения', obj.listingStatus === 'sold'
+            ? 'Снят с продажи'
+            : obj.listingStatus === 'inactive' ? 'Неактивен в ILVO' : 'Активен'],
         ['Дата снятия с продажи', obj.listingStatusDate ? formatShortDate(obj.listingStatusDate) : '—']
     ];
 

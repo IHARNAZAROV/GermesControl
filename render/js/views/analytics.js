@@ -220,7 +220,7 @@ function renderContractCard(report) {
 }
 
 function renderProfileCard(objects) {
-    const activeObjects = objects.filter((object) => object.listingStatus !== 'sold');
+    const activeObjects = objects.filter((object) => object.listingStatus === 'active');
     const typeItems = countBy(activeObjects, (object) => object.type);
     const dealItems = countBy(activeObjects, (object) => object.dealType);
     const cityItems = countBy(activeObjects, (object) => object.city).slice(0, 6);
