@@ -38,6 +38,7 @@ const VIEWS = {
 const viewRoot = document.getElementById('view-root');
 const sidebarEl = document.getElementById('sidebar');
 const topbarEl = document.getElementById('topbar');
+let scheduledRenderFrame = null;
 
 function renderSidebar(activeRoute) {
     sidebarEl.innerHTML = '';
@@ -220,11 +221,23 @@ function renderTopbar(activeRoute) {
 }
 
 function rerenderCurrent() {
+    if (scheduledRenderFrame !== null) {
+        window.cancelAnimationFrame(scheduledRenderFrame);
+        scheduledRenderFrame = null;
+    }
     const route = getCurrentRoute();
     renderSidebar(route);
     renderTopbar(route);
     const renderFn = VIEWS[route] || renderDashboard;
     renderFn(viewRoot);
+}
+
+function scheduleRerender() {
+    if (scheduledRenderFrame !== null) return;
+    scheduledRenderFrame = window.requestAnimationFrame(() => {
+        scheduledRenderFrame = null;
+        rerenderCurrent();
+    });
 }
 
 async function bootstrap() {
@@ -233,7 +246,7 @@ async function bootstrap() {
     rerenderCurrent();
 
     onRouteChange(() => rerenderCurrent());
-    subscribe(() => rerenderCurrent());
+    subscribe(scheduleRerender);
     document.addEventListener('app:refresh-chrome', () => rerenderCurrent());
     document.addEventListener('app:refresh-view', () => rerenderCurrent());
 }
