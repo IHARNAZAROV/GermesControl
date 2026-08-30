@@ -22,8 +22,7 @@ const settings = new Store({
         userName: 'Ольга Турко',
         userRole: 'Администратор',
         kufarXmlUrl: 'https://ilvo.pro/posting/Ea59071BdDe82DC8B2aCFBaa88AB80cf.xml',
-        theme: 'light',
-        autoRunCheckAfterImport: false
+        theme: 'light'
     }
 });
 
