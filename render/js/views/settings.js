@@ -1,98 +1,264 @@
-import { el } from '../format.js';
+import { el, icon, sourceLogo } from '../format.js';
 import { store, loadState, resetSampleData } from '../state.js';
 import { showToast } from '../components/toast.js';
 
+const APP_VERSION = '1.0.0';
+const APP_AUTHOR = 'АН «ГермесГарант»';
+const SITE_JSON_URL = 'https://germesgarant.by/data/objects.json';
+
+const APP_DESCRIPTION = [
+    'GermesControl — desktop-система контроля качества данных для агентства недвижимости.',
+    'Приложение автоматически сверяет объекты, договоры и рекламные выгрузки между тремя источниками: сайтом компании, ILVO CRM и площадкой Kufar.',
+    'Система находит расхождения в ценах, площадях, адресах и номерах договоров, показывает объекты, отсутствующие на площадках, и формирует отчёты в XLSX, CSV, JSON и PDF.'
+].join(' ');
+
+function createToggle(checked, onChange) {
+    const input = el('input', {
+        type: 'checkbox',
+        class: 'settings-toggle-input',
+        ...(checked ? { checked: true } : {})
+    });
+    input.addEventListener('change', () => onChange(input.checked));
+
+    const track = el('span', { class: 'settings-toggle-track' }, [
+        el('span', { class: 'settings-toggle-thumb' })
+    ]);
+
+    const wrap = el('label', { class: 'settings-toggle' }, [input, track]);
+    return { wrap, input };
+}
+
+function sectionCard({ iconName, title, subtitle, children, className = '' }) {
+    return el('section', { class: `settings-card card card-pad ${className}`.trim() }, [
+        el('div', { class: 'settings-card-head' }, [
+            el('div', { class: 'settings-card-icon' }, [icon(iconName, 18)]),
+            el('div', { class: 'settings-card-titles' }, [
+                el('h3', { class: 'settings-card-title' }, title),
+                subtitle ? el('p', { class: 'settings-card-subtitle' }, subtitle) : null
+            ])
+        ]),
+        el('div', { class: 'settings-card-body' }, children)
+    ]);
+}
+
+function settingRow({ title, description, control, className = '' }) {
+    return el('div', { class: `settings-row ${className}`.trim() }, [
+        el('div', { class: 'settings-row-copy' }, [
+            el('div', { class: 'settings-row-title' }, title),
+            description ? el('div', { class: 'settings-row-desc' }, description) : null
+        ]),
+        el('div', { class: 'settings-row-control' }, control)
+    ]);
+}
+
+function sourceEndpointRow(sourceKey, label, endpoint, note) {
+    const meta = store.sources?.[sourceKey]?.meta || {};
+    const isLoaded = (meta.count || 0) > 0;
+    const freshness = meta.importedAt
+        ? new Date(meta.importedAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+        : 'не загружался';
+
+    return el('div', { class: `settings-source-row source-${sourceKey}` }, [
+        el('div', { class: 'settings-source-mark' }, [sourceLogo(sourceKey)]),
+        el('div', { class: 'settings-source-copy' }, [
+            el('div', { class: 'settings-source-label' }, label),
+            el('div', { class: 'settings-source-endpoint' }, endpoint),
+            note ? el('div', { class: 'settings-source-note' }, note) : null
+        ]),
+        el('div', { class: 'settings-source-status' }, [
+            el('span', { class: `badge ${isLoaded ? 'badge-success' : 'badge-neutral'}` }, isLoaded ? `${meta.count} объектов` : 'Нет данных'),
+            el('span', { class: 'settings-source-time' }, freshness)
+        ])
+    ]);
+}
+
 export function renderSettings(container) {
     container.innerHTML = '';
-    container.appendChild(el('div', { class: 'page-title' }, 'Настройки'));
-    container.appendChild(el('div', { class: 'page-subtitle' }, 'Профиль, источники данных и служебные действия'));
-
     const s = store.settings || {};
 
-    const profileSection = el('div', { class: 'card card-pad settings-section' }, [
-        el('div', { class: 'card-title' }, 'Профиль'),
-        el('div', { class: 'form-row', style: 'margin-top:14px;' }, [
-            el('label', {}, 'Имя'),
-            el('input', { id: 'set-username', value: s.userName || '' })
-        ]),
-        el('div', { class: 'form-row' }, [
-            el('label', {}, 'Роль'),
-            el('input', { id: 'set-userrole', value: s.userRole || '' })
-        ]),
-        el('button', {
-            class: 'btn btn-primary',
-            onclick: async () => {
-                await window.electronAPI.setSettings({
-                    userName: document.getElementById('set-username').value,
-                    userRole: document.getElementById('set-userrole').value
-                });
-                await loadState();
-                showToast('Профиль сохранён', 'success');
-                document.dispatchEvent(new CustomEvent('app:refresh-chrome'));
-            }
-        }, 'Сохранить')
+    const header = el('header', { class: 'settings-page-header' }, [
+        el('p', { class: 'settings-eyebrow' }, 'Конфигурация'),
+        el('h2', { class: 'page-title' }, 'Настройки'),
+        el('p', { class: 'page-subtitle' }, 'Профиль, подключение источников, автоматизация и служебные действия')
     ]);
 
-    const sourceSection = el('div', { class: 'card card-pad settings-section' }, [
-        el('div', { class: 'card-title' }, 'Источники данных'),
-        el('div', { class: 'form-row', style: 'margin-top:14px;' }, [
-            el('label', {}, 'Сайт ГермесГарант (автоматическая загрузка)'),
-            el('div', { class: 'card-subtitle' }, 'https://germesgarant.by/data/objects.json')
-        ]),
-        el('div', { class: 'form-row', style: 'margin-top:14px;' }, [
-            el('label', {}, 'Ссылка на выгрузку Kufar (ILVO)'),
-            el('input', { id: 'set-kufar-url', value: s.kufarXmlUrl || '' })
-        ]),
-        el('div', { class: 'form-row', style: 'margin-top:14px;' }, [
-            el('label', {}, 'ILVO API'),
-            el('div', { class: 'card-subtitle' }, 'Ключ хранится в Secrets проекта и не показывается в приложении. Синхронизация выполняется кнопкой в окне «Загрузить данные».')
-        ]),
-        el('button', {
-            class: 'btn btn-secondary',
-            onclick: async () => {
-                await window.electronAPI.setSettings({ kufarXmlUrl: document.getElementById('set-kufar-url').value });
-                await loadState();
-                showToast('Ссылка сохранена', 'success');
-            }
-        }, 'Сохранить ссылку')
-    ]);
-
-    const storageSection = el('div', { class: 'card card-pad settings-section' }, [
-        el('div', { class: 'card-title' }, 'Хранение загрузок'),
-        el('p', { class: 'card-subtitle', style: 'margin-top:8px;' }, 'Для каждого источника сохраняются 5 последних исходных файлов. Более старые файлы удаляются автоматически после нового импорта. Текущие данные, последний отчёт и история проверок не удаляются.')
-    ]);
-
-    const dataSection = el('div', { class: 'card card-pad settings-section' }, [
-        el('div', { class: 'card-title' }, 'Демо-данные'),
-        el('p', { class: 'card-subtitle', style: 'margin: 8px 0 14px;' }, 'Скачайте примеры файлов в ожидаемом формате или восстановите демонстрационный набор данных.'),
-        el('div', { class: 'settings-actions' }, [
-            el('button', {
-                class: 'btn btn-secondary',
-                onclick: async () => {
-                    const res = await window.electronAPI.exportSampleFiles();
-                    if (!res.canceled) showToast(`Примеры сохранены в ${res.dir}`, 'success');
-                }
-            }, 'Скачать примеры файлов'),
-            el('button', {
-                class: 'btn btn-secondary',
-                onclick: async () => {
-                    await resetSampleData();
-                    showToast('Демо-данные восстановлены', 'success');
-                    document.dispatchEvent(new CustomEvent('app:refresh-view'));
-                }
-            }, 'Восстановить демо-данные')
+    const hero = el('section', { class: 'settings-hero card' }, [
+        el('div', { class: 'settings-hero-glow' }),
+        el('div', { class: 'settings-hero-inner' }, [
+            el('div', { class: 'settings-hero-main' }, [
+                el('div', { class: 'settings-hero-badges' }, [
+                    el('span', { class: 'settings-pill' }, `v${APP_VERSION}`),
+                    el('span', { class: 'settings-pill settings-pill-accent' }, 'Desktop · Electron')
+                ]),
+                el('h3', { class: 'settings-hero-title' }, 'GermesControl'),
+                el('p', { class: 'settings-hero-desc' }, APP_DESCRIPTION),
+                el('div', { class: 'settings-hero-tags' }, [
+                    'Сверка площадок',
+                    'Контроль договоров',
+                    'Отчёты',
+                    'ILVO API',
+                    'Kufar XML'
+                ].map((tag) => el('span', { class: 'settings-tag' }, tag)))
+            ]),
+            el('aside', { class: 'settings-hero-meta' }, [
+                el('div', { class: 'settings-meta-item' }, [
+                    el('span', { class: 'settings-meta-label' }, 'Автор'),
+                    el('span', { class: 'settings-meta-value' }, APP_AUTHOR)
+                ]),
+                el('div', { class: 'settings-meta-item' }, [
+                    el('span', { class: 'settings-meta-label' }, 'Лицензия'),
+                    el('span', { class: 'settings-meta-value' }, 'MIT')
+                ]),
+                el('div', { class: 'settings-meta-item' }, [
+                    el('span', { class: 'settings-meta-label' }, 'Стек'),
+                    el('span', { class: 'settings-meta-value' }, 'Electron · Vanilla JS')
+                ]),
+                el('div', { class: 'settings-meta-item' }, [
+                    el('span', { class: 'settings-meta-label' }, 'Хранение'),
+                    el('span', { class: 'settings-meta-value' }, 'JSON / XLSX / XML')
+                ])
+            ])
         ])
     ]);
 
-    const aboutSection = el('div', { class: 'card card-pad settings-section' }, [
-        el('div', { class: 'card-title' }, 'О приложении'),
-        el('p', { class: 'card-subtitle', style: 'margin-top:8px;' }, 'GermesControl — контроль объектов, договоров и рекламных площадок АН «ГермесГарант».'),
-        el('p', { class: 'card-subtitle' }, 'Версия 1.0.0')
+    const profileCard = sectionCard({
+        iconName: 'shield',
+        title: 'Профиль',
+        subtitle: 'Отображается в верхней панели приложения',
+        children: [
+            el('div', { class: 'settings-form-grid' }, [
+                el('div', { class: 'form-row' }, [
+                    el('label', { for: 'set-username' }, 'Имя'),
+                    el('input', { id: 'set-username', value: s.userName || '', placeholder: 'Ваше имя' })
+                ]),
+                el('div', { class: 'form-row' }, [
+                    el('label', { for: 'set-userrole' }, 'Роль'),
+                    el('input', { id: 'set-userrole', value: s.userRole || '', placeholder: 'Должность' })
+                ])
+            ]),
+            el('button', {
+                class: 'btn btn-primary',
+                onclick: async () => {
+                    await window.electronAPI.setSettings({
+                        userName: document.getElementById('set-username').value.trim(),
+                        userRole: document.getElementById('set-userrole').value.trim()
+                    });
+                    await loadState();
+                    showToast('Профиль сохранён', 'success');
+                    document.dispatchEvent(new CustomEvent('app:refresh-chrome'));
+                }
+            }, [icon('check', 15), 'Сохранить профиль'])
+        ]
+    });
+
+    const autoToggle = createToggle(!!s.autoRunCheckAfterImport, async (checked) => {
+        await window.electronAPI.setSettings({ autoRunCheckAfterImport: checked });
+        await loadState();
+        showToast(checked ? 'Автопроверка включена' : 'Автопроверка отключена', 'success');
+    });
+
+    const automationCard = sectionCard({
+        iconName: 'play',
+        title: 'Автоматизация',
+        subtitle: 'Поведение после загрузки данных',
+        children: [
+            settingRow({
+                title: 'Проверка после импорта',
+                description: 'Автоматически запускать сверку, когда обновлён хотя бы один источник',
+                control: autoToggle.wrap
+            })
+        ]
+    });
+
+    const sourcesCard = sectionCard({
+        iconName: 'database',
+        title: 'Источники данных',
+        subtitle: 'Подключение и актуальность выгрузок',
+        className: 'settings-card-wide',
+        children: [
+            el('div', { class: 'settings-sources-list' }, [
+                sourceEndpointRow('site', 'Сайт ГермесГарант', SITE_JSON_URL, 'Автозагрузка JSON по URL'),
+                sourceEndpointRow('ilvo', 'ILVO CRM', 'api.ilvo.pro · events', 'API-ключ хранится в .env / Secrets'),
+                sourceEndpointRow('kufar', 'Kufar', s.kufarXmlUrl || '—', 'XML-фид через ILVO Posting')
+            ]),
+            el('div', { class: 'settings-inline-field' }, [
+                el('label', { for: 'set-kufar-url' }, 'Ссылка XML-фида Kufar'),
+                el('div', { class: 'settings-inline-field-row' }, [
+                    el('input', { id: 'set-kufar-url', value: s.kufarXmlUrl || '', placeholder: 'https://…' }),
+                    el('button', {
+                        class: 'btn btn-secondary',
+                        onclick: async () => {
+                            await window.electronAPI.setSettings({
+                                kufarXmlUrl: document.getElementById('set-kufar-url').value.trim()
+                            });
+                            await loadState();
+                            showToast('Ссылка Kufar сохранена', 'success');
+                        }
+                    }, 'Сохранить')
+                ])
+            ])
+        ]
+    });
+
+    const storageCard = sectionCard({
+        iconName: 'file',
+        title: 'Хранение',
+        subtitle: 'Локальные файлы и ротация загрузок',
+        children: [
+            el('div', { class: 'settings-stat-strip' }, [
+                el('div', { class: 'settings-stat-chip' }, [
+                    el('span', { class: 'settings-stat-value' }, '5'),
+                    el('span', { class: 'settings-stat-label' }, 'файлов на источник')
+                ]),
+                el('div', { class: 'settings-stat-chip' }, [
+                    el('span', { class: 'settings-stat-value' }, '200'),
+                    el('span', { class: 'settings-stat-label' }, 'записей истории')
+                ]),
+                el('div', { class: 'settings-stat-chip' }, [
+                    el('span', { class: 'settings-stat-value' }, 'data/'),
+                    el('span', { class: 'settings-stat-label' }, 'рабочая папка')
+                ])
+            ]),
+            el('p', { class: 'settings-note' }, 'Для каждого источника сохраняются 5 последних исходных файлов. Более старые удаляются после нового импорта. Текущие данные, последний отчёт и история проверок не затрагиваются.')
+        ]
+    });
+
+    const demoCard = sectionCard({
+        iconName: 'spark',
+        title: 'Демо и образцы',
+        subtitle: 'Для тестирования и обучения команды',
+        className: 'settings-card-wide',
+        children: [
+            el('p', { class: 'settings-note' }, 'Скачайте примеры файлов в ожидаемом формате или восстановите демонстрационный набор с намеренными расхождениями.'),
+            el('div', { class: 'settings-actions' }, [
+                el('button', {
+                    class: 'btn btn-secondary',
+                    onclick: async () => {
+                        const res = await window.electronAPI.exportSampleFiles();
+                        if (!res.canceled) showToast(`Примеры сохранены в ${res.dir}`, 'success');
+                    }
+                }, [icon('upload', 15), 'Скачать примеры']),
+                el('button', {
+                    class: 'btn btn-ghost',
+                    onclick: async () => {
+                        await resetSampleData();
+                        showToast('Демо-данные восстановлены', 'success');
+                        document.dispatchEvent(new CustomEvent('app:refresh-view'));
+                    }
+                }, 'Восстановить демо-данные')
+            ])
+        ]
+    });
+
+    const bento = el('div', { class: 'settings-bento' }, [
+        profileCard,
+        automationCard,
+        sourcesCard,
+        storageCard,
+        demoCard
     ]);
 
-    container.appendChild(profileSection);
-    container.appendChild(sourceSection);
-    container.appendChild(storageSection);
-    container.appendChild(dataSection);
-    container.appendChild(aboutSection);
+    container.appendChild(header);
+    container.appendChild(hero);
+    container.appendChild(bento);
 }

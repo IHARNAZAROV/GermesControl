@@ -168,6 +168,8 @@
 @media (prefers-reduced-motion: reduce) {
     .filter-chip { transition: none; }
     .filter-content-enter { animation: none; }
+    .settings-toggle-track,
+    .settings-toggle-thumb { transition: none; }
 }
 
 table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }

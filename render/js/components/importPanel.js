@@ -1,5 +1,5 @@
 import { el, formatDateTime, sourceLogo } from '../format.js';
-import { store, importSource, importSiteFromUrl, importIlvoFromApi, importKufarFromUrl } from '../state.js';
+import { store, importSource, importSiteFromUrl, importIlvoFromApi, importKufarFromUrl, runCheck } from '../state.js';
 import { openModal, closeModal } from './modal.js';
 import { showToast } from './toast.js';
 
@@ -8,6 +8,18 @@ const SOURCE_META = {
     ilvo: { label: 'ILVO CRM', format: 'XLSX', hint: 'Ручная выгрузка объектов из ILVO' },
     kufar: { label: 'Kufar', format: 'XML', hint: 'Автоматическая выгрузка объявлений из ILVO' }
 };
+
+async function afterImport(onChanged) {
+    if (onChanged) onChanged();
+    if (store.settings?.autoRunCheckAfterImport) {
+        try {
+            await runCheck();
+            showToast('Автопроверка завершена', 'success');
+        } catch (err) {
+            showToast(err.message || 'Не удалось выполнить автопроверку', 'error');
+        }
+    }
+}
 
 function sourceCard(key, onChanged) {
     const meta = SOURCE_META[key];
@@ -38,7 +50,7 @@ function sourceCard(key, onChanged) {
                     showToast('Обновление данных с сайта...');
                     const res = await importSiteFromUrl();
                     showToast(`Сайт ГермесГарант: загружено ${res.count} объектов`, 'success');
-                    onChanged();
+                    await afterImport(onChanged);
                 } catch (err) {
                     showToast(err.message || 'Не удалось загрузить данные с сайта', 'error');
                 }
@@ -51,7 +63,7 @@ function sourceCard(key, onChanged) {
                     const res = await importSource(key);
                     if (!res.canceled) {
                         showToast(`${meta.label}: загружено ${res.count} объектов`, 'success');
-                        onChanged();
+                        await afterImport(onChanged);
                     }
                 } catch (err) {
                     showToast(err.message || 'Ошибка загрузки файла', 'error');
@@ -66,7 +78,7 @@ function sourceCard(key, onChanged) {
                     showToast('Синхронизация ILVO по API...');
                     const res = await importIlvoFromApi();
                     showToast(`ILVO API: загружено ${res.count} объектов из ${res.eventCount} событий`, 'success');
-                    onChanged();
+                    await afterImport(onChanged);
                 } catch (err) {
                     showToast(err.message || 'Не удалось загрузить данные ILVO по API', 'error');
                 }
@@ -79,7 +91,7 @@ function sourceCard(key, onChanged) {
                     const res = await importSource(key);
                     if (!res.canceled) {
                         showToast(`${meta.label}: загружено ${res.count} объектов`, 'success');
-                        onChanged();
+                        await afterImport(onChanged);
                     }
                 } catch (err) {
                     showToast(err.message || 'Ошибка загрузки файла', 'error');
@@ -94,7 +106,7 @@ function sourceCard(key, onChanged) {
                     const res = await importSource(key);
                     if (!res.canceled) {
                         showToast(`${meta.label}: загружено ${res.count} объектов`, 'success');
-                        onChanged();
+                        await afterImport(onChanged);
                     }
                 } catch (err) {
                     showToast(err.message || 'Ошибка загрузки файла', 'error');
@@ -111,7 +123,7 @@ function sourceCard(key, onChanged) {
                     showToast('Загрузка XML по ссылке...');
                     const res = await importKufarFromUrl(store.settings.kufarXmlUrl);
                     showToast(`Kufar: загружено ${res.count} объектов`, 'success');
-                    onChanged();
+                    await afterImport(onChanged);
                 } catch (err) {
                     showToast(err.message || 'Не удалось загрузить XML по ссылке', 'error');
                 }
