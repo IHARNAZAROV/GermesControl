@@ -206,6 +206,11 @@ table.data-table td {
 }
 table.data-table td.nowrap { white-space: nowrap; overflow-wrap: normal; }
 table.data-table tbody tr:hover { background: var(--color-surface-mint); }
+table.data-table tbody tr.table-row-clickable { cursor: pointer; }
+table.data-table tbody tr.table-row-clickable:focus-visible {
+    outline: 2px solid var(--color-primary-light);
+    outline-offset: -2px;
+}
 .table-empty { padding: 40px; text-align: center; color: var(--color-text-secondary); }
 .table-wrap { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
 
@@ -231,6 +236,29 @@ table.data-table--dense th[data-column-key="status"],
 table.data-table--dense td[data-column-key="status"] { width: 180px; }
 table.data-table--dense th[data-column-key="actions"],
 table.data-table--dense td[data-column-key="actions"] { width: 104px; }
+
+table.data-table--objects { table-layout: fixed; }
+table.data-table--objects th[data-column-key="objectNumber"],
+table.data-table--objects td[data-column-key="objectNumber"] { width: 6%; }
+table.data-table--objects th[data-column-key="title"],
+table.data-table--objects td[data-column-key="title"] { width: 28%; }
+table.data-table--objects th[data-column-key="price"],
+table.data-table--objects td[data-column-key="price"] { width: 13%; }
+table.data-table--objects th[data-column-key="contractNumber"],
+table.data-table--objects td[data-column-key="contractNumber"] { width: 13%; }
+table.data-table--objects th[data-column-key="site"],
+table.data-table--objects td[data-column-key="site"],
+table.data-table--objects th[data-column-key="ilvo"],
+table.data-table--objects td[data-column-key="ilvo"],
+table.data-table--objects th[data-column-key="kufar"],
+table.data-table--objects td[data-column-key="kufar"] { width: 6%; }
+table.data-table--objects th[data-column-key="status"],
+table.data-table--objects td[data-column-key="status"] { width: 21%; }
+table.data-table--objects td[data-column-key="status"] .badge {
+    white-space: normal;
+    line-height: 1.25;
+    text-align: center;
+}
 
 /* ---------- Modal ---------- */
 .modal-box {

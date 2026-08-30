@@ -13,7 +13,10 @@ export function renderDataTable({
     emptyText = 'Нет данных',
     pageSize = 50,
     initialSortKey = null,
-    initialSortDir = 1
+    initialSortDir = 1,
+    tableClassName = '',
+    onRowClick = null,
+    rowLabel = null
 }) {
     let query = '';
     let sortKey = initialSortKey;
@@ -35,7 +38,9 @@ export function renderDataTable({
     if (searchFields.length) wrap.appendChild(toolbar);
 
     const tableWrap = el('div', { class: 'table-wrap' });
-    const tableClass = columns.length > 8 ? 'data-table data-table--dense' : 'data-table';
+    const tableClass = ['data-table', columns.length > 8 ? 'data-table--dense' : '', tableClassName]
+        .filter(Boolean)
+        .join(' ');
     const table = el('table', { class: tableClass });
     const thead = el('thead');
     const headRow = el('tr');
@@ -91,7 +96,19 @@ export function renderDataTable({
             const pageRows = filtered.slice(page * pageSize, (page + 1) * pageSize);
             const fragment = document.createDocumentFragment();
             pageRows.forEach((row) => {
-                const tr = el('tr');
+                const tr = el('tr', onRowClick ? {
+                    class: 'table-row-clickable',
+                    role: 'button',
+                    tabindex: '0',
+                    'aria-label': rowLabel ? rowLabel(row) : 'Открыть запись',
+                    onclick: () => onRowClick(row),
+                    onkeydown: (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onRowClick(row);
+                        }
+                    }
+                } : {});
                 columns.forEach((col) => {
                     const td = el('td', {
                         class: col.nowrap ? 'nowrap' : '',

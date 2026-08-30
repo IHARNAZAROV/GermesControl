@@ -192,18 +192,18 @@ export function renderObjects(container) {
                 { key: 'objectNumber', label: '№', nowrap: true },
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
                 { key: 'price', label: 'Цена', render: formatObjectPrice },
-                { key: 'totalArea', label: 'Площадь', render: (o) => formatMoney(o.totalArea, 'м²') },
                 { key: 'contractNumber', label: 'Договор', render: (o) => o.contractNumber || '—' },
-                { key: 'matchedBy', label: 'Объединено', render: (o) => matchBasis(o) },
                 { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => presenceChip(o.presence.site) },
                 { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => presenceChip(o.presence.ilvo) },
                 { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => presenceChip(o.presence.kufar) },
-                { key: 'status', label: 'Статус', render: (o) => statusBadge(o.status, o.listingStatus, o.listingStatusDate) },
-                { key: 'actions', label: '', render: (o) => el('span', { class: 'btn btn-ghost btn-sm', onclick: () => showObjectDetail(o) }, 'Открыть') }
+                { key: 'status', label: 'Статус', render: (o) => statusBadge(o.status, o.listingStatus, o.listingStatusDate) }
             ],
             rows,
             searchFields: ['objectNumber', 'title', 'city', 'address', 'contractNumber'],
-            emptyText: 'Объекты не найдены'
+            emptyText: 'Объекты не найдены',
+            tableClassName: 'data-table--objects',
+            onRowClick: showObjectDetail,
+            rowLabel: (o) => `Открыть объект ${o.objectNumber || o.title || ''}`.trim()
         }));
     }
 
