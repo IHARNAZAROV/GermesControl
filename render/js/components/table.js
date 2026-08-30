@@ -35,11 +35,13 @@ export function renderDataTable({
     if (searchFields.length) wrap.appendChild(toolbar);
 
     const tableWrap = el('div', { class: 'table-wrap' });
-    const table = el('table', { class: 'data-table' });
+    const tableClass = columns.length > 8 ? 'data-table data-table--dense' : 'data-table';
+    const table = el('table', { class: tableClass });
     const thead = el('thead');
     const headRow = el('tr');
     columns.forEach((col) => {
         const th = el('th', {
+            'data-column-key': col.key,
             onclick: () => {
                 if (sortKey === col.key) sortDir = -sortDir; else { sortKey = col.key; sortDir = 1; }
                 renderBody();
@@ -91,7 +93,10 @@ export function renderDataTable({
             pageRows.forEach((row) => {
                 const tr = el('tr');
                 columns.forEach((col) => {
-                    const td = el('td', { class: col.nowrap ? 'nowrap' : '' });
+                    const td = el('td', {
+                        class: col.nowrap ? 'nowrap' : '',
+                        'data-column-key': col.key
+                    });
                     const value = col.render ? col.render(row) : (row[col.key] ?? '—');
                     if (value instanceof Node) td.appendChild(value);
                     else td.textContent = value;

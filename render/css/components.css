@@ -172,8 +172,19 @@
     .settings-toggle-thumb { transition: none; }
 }
 
-table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.data-table { min-width: 760px; }
+table.data-table {
+    width: 100%;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    table-layout: auto;
+}
+/* Wide registries keep readable column widths and scroll as a whole instead
+   of squeezing long titles into one-character-wide cells. */
+table.data-table--dense {
+    min-width: 1230px;
+    table-layout: fixed;
+}
 table.data-table th {
     text-align: left;
     font-size: 10px;
@@ -186,11 +197,40 @@ table.data-table th {
     white-space: nowrap;
 }
 table.data-table th.sorted::after { content: ' \25BE'; }
-table.data-table td { padding: 12px; border-bottom: 1px solid var(--color-border); vertical-align: middle; overflow-wrap: anywhere; }
+table.data-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
 table.data-table td.nowrap { white-space: nowrap; overflow-wrap: normal; }
 table.data-table tbody tr:hover { background: var(--color-surface-mint); }
 .table-empty { padding: 40px; text-align: center; color: var(--color-text-secondary); }
 .table-wrap { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+
+table.data-table--dense th[data-column-key="objectNumber"],
+table.data-table--dense td[data-column-key="objectNumber"] { width: 56px; }
+table.data-table--dense th[data-column-key="title"],
+table.data-table--dense td[data-column-key="title"] { width: 250px; }
+table.data-table--dense th[data-column-key="price"],
+table.data-table--dense td[data-column-key="price"] { width: 120px; }
+table.data-table--dense th[data-column-key="totalArea"],
+table.data-table--dense td[data-column-key="totalArea"] { width: 95px; }
+table.data-table--dense th[data-column-key="contractNumber"],
+table.data-table--dense td[data-column-key="contractNumber"] { width: 115px; }
+table.data-table--dense th[data-column-key="matchedBy"],
+table.data-table--dense td[data-column-key="matchedBy"] { width: 145px; }
+table.data-table--dense th[data-column-key="site"],
+table.data-table--dense td[data-column-key="site"],
+table.data-table--dense th[data-column-key="ilvo"],
+table.data-table--dense td[data-column-key="ilvo"],
+table.data-table--dense th[data-column-key="kufar"],
+table.data-table--dense td[data-column-key="kufar"] { width: 55px; }
+table.data-table--dense th[data-column-key="status"],
+table.data-table--dense td[data-column-key="status"] { width: 180px; }
+table.data-table--dense th[data-column-key="actions"],
+table.data-table--dense td[data-column-key="actions"] { width: 104px; }
 
 /* ---------- Modal ---------- */
 .modal-box {
