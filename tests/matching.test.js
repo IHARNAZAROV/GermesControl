@@ -162,6 +162,11 @@ test('missing deal type is not reported as a mismatch', () => {
     assert.equal(report.errors.some((error) => error.type === ERROR_TYPES.DEAL_TYPE_MISMATCH), false);
 });
 
+test('object titles start with an uppercase letter', () => {
+    const report = comparison();
+    assert.match(report.objects[0].title, /^Дом(?:\s|$)/);
+});
+
 test('explicitly different deal types produce a dedicated mismatch', () => {
     const report = comparison({ ilvo: { dealType: 'Аренда' } });
     assert.equal(report.objects.length, 1);

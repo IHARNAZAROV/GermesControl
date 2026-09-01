@@ -261,7 +261,10 @@ function formatObjectTitle(record) {
         else addressPhrase = `по адресу ${rawAddress}`;
     }
 
-    return [propertyName, cityPhrase, addressPhrase].filter(Boolean).join(' ') || record.title || 'Объект недвижимости';
+    const title = [propertyName, cityPhrase, addressPhrase].filter(Boolean).join(' ')
+        || record.title
+        || 'Объект недвижимости';
+    return title.charAt(0).toLocaleUpperCase('ru-RU') + title.slice(1);
 }
 
 function pricesMatch(a, b) {
