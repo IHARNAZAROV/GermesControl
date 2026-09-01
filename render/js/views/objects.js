@@ -249,6 +249,18 @@ function showObjectDetail(obj) {
         ]),
         el('div', { class: 'object-detail-content' }, [
             el('main', { class: 'object-detail-main' }, [
+                el('section', { class: 'object-info-section object-diffs-section object-priority-section' }, [
+                    el('div', { class: 'object-section-heading' }, [
+                        el('div', {}, [
+                            el('span', { class: 'object-section-kicker' }, 'Контроль качества'),
+                            el('h3', {}, obj.fieldDiffs?.length ? `Расхождения · ${obj.fieldDiffs.length}` : 'Проверка данных')
+                        ]),
+                        obj.fieldDiffs?.length
+                            ? el('span', { class: 'object-priority-badge' }, 'Требует внимания')
+                            : el('span', { class: 'object-priority-badge is-clean' }, 'Проверено')
+                    ]),
+                    renderObjectDiffs(obj)
+                ]),
                 el('section', { class: 'object-info-section' }, [
                     el('div', { class: 'object-section-heading' }, [
                         el('div', {}, [
@@ -268,24 +280,6 @@ function showObjectDetail(obj) {
                         detailItem('Размещение', listingNote)
                     ])
                 ]),
-                obj.description ? el('section', { class: 'object-info-section object-description-section' }, [
-                    el('div', { class: 'object-section-heading' }, [
-                        el('div', {}, [
-                            el('span', { class: 'object-section-kicker' }, 'Описание'),
-                            el('h3', {}, 'Об объекте')
-                        ])
-                    ]),
-                    el('p', { class: 'object-description' }, obj.description)
-                ]) : null,
-                el('section', { class: 'object-info-section object-diffs-section' }, [
-                    el('div', { class: 'object-section-heading' }, [
-                        el('div', {}, [
-                            el('span', { class: 'object-section-kicker' }, 'Контроль качества'),
-                            el('h3', {}, obj.fieldDiffs?.length ? `Расхождения · ${obj.fieldDiffs.length}` : 'Проверка данных')
-                        ])
-                    ]),
-                    renderObjectDiffs(obj)
-                ])
             ]),
             el('aside', { class: 'object-detail-aside' }, [
                 el('section', { class: 'object-aside-card object-source-card' }, [
