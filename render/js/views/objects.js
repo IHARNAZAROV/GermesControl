@@ -162,6 +162,38 @@ function detailItem(label, value, className = '') {
     ]);
 }
 
+function hasFieldDiff(obj, field) {
+    return Array.isArray(obj.fieldDiffs) && obj.fieldDiffs.some((diff) => diff.field === field);
+}
+
+function diffClass(obj, ...fields) {
+    return fields.some((field) => hasFieldDiff(obj, field)) ? 'is-diff-highlight' : '';
+}
+
+function normalizedDiffValue(value) {
+    if (value === null || value === undefined || value === '') return '__empty__';
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue)) return `number:${numericValue}`;
+    return `text:${String(value).trim().toLocaleLowerCase('ru-RU')}`;
+}
+
+function diffValueState(values, source) {
+    const entries = Object.entries(values).filter(([, value]) => value !== undefined && value !== null && value !== '');
+    if (entries.length < 2) return 'is-neutral';
+
+    const counts = new Map();
+    entries.forEach(([, value]) => {
+        const key = normalizedDiffValue(value);
+        counts.set(key, (counts.get(key) || 0) + 1);
+    });
+
+    const valueKey = normalizedDiffValue(values[source]);
+    const maxCount = Math.max(...counts.values());
+    return counts.get(valueKey) === maxCount && maxCount > 1
+        ? 'is-consistent'
+        : 'is-different';
+}
+
 function sourceStatusRow(source, label, present) {
     return el('div', { class: `object-source-row ${present ? 'is-present' : 'is-missing'}` }, [
         el('span', { class: 'object-source-logo' }, [sourceLogo(source)]),
@@ -199,9 +231,19 @@ function renderObjectDiffs(obj) {
                 d.label
             ]),
             el('div', { class: 'field-diff-values' }, ['site', 'ilvo', 'kufar'].map((src) =>
-                d.values[src] !== undefined ? el('div', { class: 'fv' }, [
+                d.values[src] !== undefined ? el('div', {
+                    class: `fv ${diffValueState(d.values, src)}`,
+                    title: diffValueState(d.values, src) === 'is-different'
+                        ? 'Значение отличается от большинства источников'
+                        : 'Значение совпадает с большинством источников'
+                }, [
                     el('span', { class: 'src' }, src === 'site' ? 'Сайт' : src === 'ilvo' ? 'ILVO' : 'Kufar'),
-                    el('strong', {}, formatMoney(d.values[src], d.unit))
+                    el('strong', {}, [
+                        diffValueState(d.values, src) === 'is-different'
+                            ? el('span', { class: 'fv-alert-mark', 'aria-hidden': 'true' }, '!')
+                            : null,
+                        formatMoney(d.values[src], d.unit)
+                    ])
                 ]) : null
             )),
             el('span', { class: 'badge badge-warning' }, '\u26A0 Значения отличаются')
@@ -230,16 +272,16 @@ function showObjectDetail(obj) {
                     icon('building', 16),
                     el('span', {}, [obj.city, obj.address].filter(Boolean).join(', ') || 'Адрес не указан')
                 ]),
-                el('div', { class: 'object-hero-price' }, [
+                el('div', { class: `object-hero-price ${diffClass(obj, 'price', 'priceUsd')}`.trim() }, [
                     el('strong', {}, price),
                     obj.price && obj.priceUsd
                         ? el('span', {}, formatMoney(obj.priceUsd, 'USD'))
                         : null
                 ]),
                 el('div', { class: 'object-quick-stats' }, [
-                    detailItem('Площадь', formatMoney(obj.totalArea, 'м²')),
-                    detailItem('Комнаты', obj.rooms || '—'),
-                    detailItem('Этаж', obj.floor ? `${obj.floor} / ${obj.floors ?? '—'}` : '—')
+                    detailItem('Площадь', formatMoney(obj.totalArea, 'м²'), diffClass(obj, 'totalArea')),
+                    detailItem('Комнаты', obj.rooms || '—', diffClass(obj, 'rooms')),
+                    detailItem('Этаж', obj.floor ? `${obj.floor} / ${obj.floors ?? '—'}` : '—', diffClass(obj, 'floor', 'floors'))
                 ]),
                 el('div', { class: 'object-hero-note' }, [
                     el('span', { class: 'object-hero-note-dot' }),
@@ -273,9 +315,9 @@ function showObjectDetail(obj) {
                         detailItem('Тип объекта', obj.type),
                         detailItem('Город', obj.city),
                         detailItem('Адрес', obj.address),
-                        detailItem('Жилая площадь', formatMoney(obj.livingArea, 'м²')),
-                        detailItem('Площадь кухни', formatMoney(obj.kitchenArea, 'м²')),
-                        detailItem('Этажность', obj.floors ? `${obj.floors} этажей` : '—'),
+                        detailItem('Жилая площадь', formatMoney(obj.livingArea, 'м²'), diffClass(obj, 'livingArea')),
+                        detailItem('Площадь кухни', formatMoney(obj.kitchenArea, 'м²'), diffClass(obj, 'kitchenArea')),
+                        detailItem('Этажность', obj.floors ? `${obj.floors} этажей` : '—', diffClass(obj, 'floors')),
                         detailItem('Договор', obj.contractNumber || 'Не указан', obj.contractNumber ? '' : 'is-warning'),
                         detailItem('Размещение', listingNote)
                     ])

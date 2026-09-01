@@ -225,6 +225,9 @@
 .object-hero-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
 .object-hero-price strong { color: var(--color-primary-dark); font-size: 25px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
 .object-hero-price span { color: var(--color-text-secondary); font-size: 11.5px; font-weight: 650; }
+.object-hero-price.is-diff-highlight { align-self: flex-start; margin-top: 14px; padding: 8px 10px; border: 1px solid rgba(209, 138, 50, 0.42); border-radius: 11px; background: #FFF7E9; }
+.object-hero-price.is-diff-highlight strong { color: #A76518; }
+.object-hero-price.is-diff-highlight span { color: var(--color-warning); }
 .object-quick-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -234,6 +237,9 @@
 }
 .object-quick-stats .object-detail-item { min-height: 59px; padding: 10px 9px; border: 1px solid var(--color-border); border-radius: 11px; background: rgba(237, 244, 239, 0.74); }
 .object-quick-stats .object-detail-value { margin-top: 4px; font-size: 12px; }
+.object-detail-item.is-diff-highlight { border-color: rgba(209, 138, 50, 0.42); background: #FFF7E9; }
+.object-detail-item.is-diff-highlight .object-detail-label { color: var(--color-warning); }
+.object-detail-item.is-diff-highlight .object-detail-value { color: #A76518; }
 .object-hero-note { display: flex; align-items: center; gap: 7px; margin-top: 16px; color: var(--color-text-secondary); font-size: 10.5px; }
 .object-hero-note-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 0 4px var(--color-success-bg); }
 .object-detail-content {
@@ -285,6 +291,7 @@
 .object-spec-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
 .object-detail-item { min-width: 0; padding: 10px 0; border-bottom: 1px solid #EEF3EF; }
 .object-spec-grid .object-detail-item:nth-last-child(-n+2) { border-bottom: 0; }
+.object-spec-grid .object-detail-item.is-diff-highlight { padding: 9px; border: 1px solid rgba(209, 138, 50, 0.34); border-radius: 10px; background: #FFF7E9; }
 .object-detail-label { display: block; color: var(--color-text-secondary); font-size: 10.5px; line-height: 1.25; }
 .object-detail-value { display: block; margin-top: 3px; color: var(--color-text); font-size: 12.5px; line-height: 1.35; overflow-wrap: anywhere; }
 .object-detail-item.is-warning .object-detail-value { color: var(--color-warning); }
@@ -293,9 +300,42 @@
 .object-diff-list .field-diff-card { margin: 0; padding: 11px 12px; background: #FFFDFC; border-color: #F1E3C5; }
 .field-diff-card .field-name { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
 .object-diff-marker { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--color-warning); box-shadow: 0 0 0 4px var(--color-warning-bg); }
-.field-diff-values { gap: 8px 14px; }
-.field-diff-values .fv { display: inline-flex; align-items: baseline; gap: 5px; font-size: 11.5px; }
+.field-diff-values { display: flex; gap: 7px; flex-wrap: wrap; }
+.field-diff-values .fv {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: #F7FAF8;
+    font-size: 11.5px;
+}
 .field-diff-values .fv .src { margin-right: 0; color: var(--color-text-secondary); }
+.field-diff-values .fv strong { color: var(--color-text); font-variant-numeric: tabular-nums; }
+.field-diff-values .fv.is-consistent { border-color: rgba(47, 169, 120, 0.18); background: #F2FAF6; }
+.field-diff-values .fv.is-different {
+    border-color: rgba(209, 138, 50, 0.48);
+    background: #FFF1D9;
+    box-shadow: 0 2px 7px rgba(209, 138, 50, 0.1);
+}
+.field-diff-values .fv.is-different .src,
+.field-diff-values .fv.is-different strong { color: #A76518; }
+.fv-alert-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 1px;
+    border-radius: 50%;
+    background: var(--color-warning);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+}
 .object-diff-list .badge { margin-top: 9px; }
 .object-clean-state { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid rgba(47, 169, 120, 0.2); border-radius: 11px; background: var(--color-success-bg); }
 .object-clean-icon { width: 27px; height: 27px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 9px; background: #fff; color: var(--color-success); }
