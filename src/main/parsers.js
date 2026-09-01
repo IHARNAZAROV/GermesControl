@@ -208,14 +208,45 @@ function extractFloorFromText(text) {
 
 function readRowValue(row, aliases) {
     const values = new Map(Object.entries(row || {}).map(([key, value]) => [
-        String(key).trim().toLowerCase(),
+        String(key).normalize('NFKC').toLowerCase().replace(/ё/g, 'е').replace(/[^0-9a-zа-я]+/giu, ''),
         value
     ]));
     for (const alias of aliases) {
-        const value = values.get(String(alias).trim().toLowerCase());
+        const normalizedAlias = String(alias).normalize('NFKC').toLowerCase()
+            .replace(/ё/g, 'е')
+            .replace(/[^0-9a-zа-я]+/giu, '');
+        const value = values.get(normalizedAlias);
         if (value !== undefined && value !== null && String(value).trim() !== '') return value;
     }
     return null;
+}
+
+function parseIlvoFirstNumber(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const match = String(value).replace(/\u00a0/g, ' ').match(/[-+]?\d+(?:[.,]\d+)?/u);
+    return match ? toNumberOrNull(match[0]) : null;
+}
+
+function parseIlvoPair(value) {
+    if (value === undefined || value === null || value === '') {
+        return { current: null, total: null };
+    }
+    const parts = String(value).split(/\s*(?:\/|из)\s*/iu);
+    return {
+        current: parseIlvoFirstNumber(parts[0]),
+        total: parseIlvoFirstNumber(parts[1])
+    };
+}
+
+function parseIlvoAreaTriplet(value) {
+    const parts = value === undefined || value === null || value === ''
+        ? []
+        : String(value).split('/');
+    return {
+        totalArea: parseIlvoFirstNumber(parts[0]),
+        livingArea: parseIlvoFirstNumber(parts[1]),
+        kitchenArea: parseIlvoFirstNumber(parts[2])
+    };
 }
 
 function extractIlvoDealType(row) {
@@ -234,28 +265,44 @@ function extractIlvoDealType(row) {
     ]));
 }
 
+function addressContainsHousing(address, housing) {
+    if (!address || !housing) return false;
+    const escapedHousing = String(housing).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?:к|корп(?:ус)?)\\.?\\s*${escapedHousing}(?![0-9A-Za-zА-Яа-яЁё])`, 'iu')
+        .test(String(address));
+}
+
 function buildIlvoAddress(row) {
     const parts = [];
-    const street = cleanString(row['Улица']);
-    const house = cleanString(row['Дом']);
-    const details = cleanString(row['Детали адреса']);
+    const street = cleanString(readRowValue(row, ['Улица', 'street']));
+    const house = cleanString(readRowValue(row, ['Дом', 'building']));
+    const details = cleanString(readRowValue(row, ['Детали адреса', 'addressDetails']));
+    const housing = cleanString(readRowValue(row, ['Корпус', 'Корп.', 'housing', 'buildingSection']));
     if (street) parts.push(street);
     // «Детали адреса» часто уже включает номер дома (например, дом="16",
     // детали="16к 2") — в этом случае не дублируем номер дома отдельно.
     const detailsStartsWithHouse = house && details && details.replace(/\s+/g, '').startsWith(house.replace(/\s+/g, ''));
-    if (house && !detailsStartsWithHouse) parts.push(house);
-    if (details && details !== house) parts.push(details);
+    if (detailsStartsWithHouse) {
+        // Если детали совпадают только с номером дома, сохраняем и этот
+        // номер. Если в деталях уже есть корпус/другая часть адреса,
+        // используем их как более полную запись вместо отдельного дома.
+        parts.push(details);
+    } else {
+        if (house) parts.push(house);
+        if (details) parts.push(details);
+    }
+    // В новых выгрузках корпус вынесен в отдельную колонку. Не добавляем
+    // его повторно, если старое поле «Детали адреса» уже содержит корпус.
+    const addressParts = [house, details].filter(Boolean).join(' ');
+    if (housing && !addressContainsHousing(addressParts, housing)) parts.push(`корпус ${housing}`);
     return parts.length ? parts.join(', ') : null;
 }
 
 /**
  * ILVO CRM — ручная выгрузка в формате XLSX. Реальный экспорт — это
  * книга с листом на каждый тип объекта (Квартира/Дом/Участок/...),
- * без явного ID и без отдельных полей площади/комнат — эти значения
- * извлекаются эвристически (регулярными выражениями) из свободного
- * текста колонки «Описание». Такое извлечение приблизительное:
- * если в тексте нет чётко сформулированной фразы, поле останется
- * пустым, а не будет угадано наугад.
+ * без явного ID. Площади, корпус и комнаты берутся из отдельных колонок
+ * выгрузки, а не извлекаются из свободного текста «Описание».
  */
 async function parseIlvoXlsx(filePath) {
     const wb = XLSX.readFile(filePath);
@@ -264,23 +311,31 @@ async function parseIlvoXlsx(filePath) {
     for (const sheetName of wb.SheetNames) {
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: null });
         for (const row of rows) {
-            const desc = cleanString(row['Описание']);
-            const contractNumber = row['Договор'] ?? null;
+            const desc = cleanString(readRowValue(row, ['Описание', 'description']));
+            const contractNumber = readRowValue(row, ['Договор', 'contractNumber']);
+            const areaParts = parseIlvoAreaTriplet(readRowValue(row, [
+                'Площадь(о/ж/к)',
+                'Площадь (О/Ж/К)',
+                'Площадь О/Ж/К',
+                'Площадь О Ж К'
+            ]));
+            const floorParts = parseIlvoPair(readRowValue(row, ['Этаж/Всего', 'Этаж / Всего']));
+            const rooms = parseIlvoFirstNumber(readRowValue(row, ['Комнат/Всего', 'Комнат / Всего', 'Комнаты/Всего']));
             const rec = finalizeRecord({
                 id: null,
                 title: null,
                 type: sheetName,
                 dealType: extractIlvoDealType(row),
-                city: row['Город'] || null,
+                city: readRowValue(row, ['Город', 'city']),
                 address: buildIlvoAddress(row),
-                price: row['Цена'] ?? null,
+                price: readRowValue(row, ['Цена', 'price']),
                 priceUsd: null,
-                rooms: extractRoomsFromText(desc, sheetName),
-                totalArea: extractTotalAreaFromText(desc),
-                livingArea: extractNumberNear(desc, /жил[а-я]*\s*(?:площад[а-я]*)?[^0-9]{0,15}([\d.,]+)/i),
-                kitchenArea: extractNumberNear(desc, /кухн[а-я]*[^0-9]{0,15}([\d.,]+)/i),
-                floor: extractFloorFromText(desc),
-                floors: extractFloorsFromText(desc),
+                rooms,
+                totalArea: areaParts.totalArea,
+                livingArea: areaParts.livingArea,
+                kitchenArea: areaParts.kitchenArea,
+                floor: floorParts.current,
+                floors: floorParts.total,
                 description: desc,
                 contractNumber,
                 contractDate: extractContractDate(contractNumber) || extractContractDate(desc),

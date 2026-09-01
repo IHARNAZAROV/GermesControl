@@ -165,6 +165,9 @@ const ADDRESS_STOPWORDS = /(?<![0-9A-Za-zА-Яа-яЁё])(ул|улица|пр|�
 function cleanLocationText(s) {
     return String(s || '')
         .toLowerCase()
+        .normalize('NFKC')
+        .replace(/(?:корпус|корп)\.?\s*/giu, 'к ')
+        .replace(/(\d)\s*к\s*(?=\d)/giu, '$1 к ')
         .replace(/[«»"'.,№]/g, ' ')
         .replace(ADDRESS_STOPWORDS, ' ')
         .replace(/\s+/g, ' ')

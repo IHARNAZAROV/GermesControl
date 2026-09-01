@@ -153,6 +153,76 @@ test('ILVO does not infer deal type from description', async () => {
     fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('ILVO reads areas, rooms, floor, and corpus from dedicated columns', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'germescontrol-'));
+    const filePath = path.join(dir, 'ilvo-columns.xlsx');
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet([{
+        Договор: '38/1',
+        Город: 'Лида',
+        Улица: 'Октябрьская',
+        Дом: '16',
+        'Детали адреса': '16',
+        Корпус: '2',
+        'Этаж/Всего': '3 из 9',
+        'Площадь(о/ж/к)': '101.2 / 61,5 / 12 м²',
+        'Комнат/Всего': '4 из 4',
+        Описание: 'В описании ошибочно указано: 999 / 888 / 777 м² и 1-комнатная квартира.',
+        Цена: '100 000'
+    }]);
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Квартира');
+    XLSX.writeFile(workbook, filePath);
+
+    const [parsed] = await parseIlvoXlsx(filePath);
+    assert.equal(parsed.totalArea, 101.2);
+    assert.equal(parsed.livingArea, 61.5);
+    assert.equal(parsed.kitchenArea, 12);
+    assert.equal(parsed.rooms, 4);
+    assert.equal(parsed.floor, 3);
+    assert.equal(parsed.floors, 9);
+    assert.equal(parsed.address, 'Октябрьская, 16, корпус 2');
+    fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('ILVO does not infer areas or rooms from description when dedicated columns are empty', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'germescontrol-'));
+    const filePath = path.join(dir, 'ilvo-empty-columns.xlsx');
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet([{
+        Описание: 'Дом площадью 120 м2, 3-комнатный, жилая 70 м2, кухня 15 м2.',
+        'Площадь(о/ж/к)': '-',
+        'Комнат/Всего': '-'
+    }]);
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Дом');
+    XLSX.writeFile(workbook, filePath);
+
+    const [parsed] = await parseIlvoXlsx(filePath);
+    assert.equal(parsed.totalArea, null);
+    assert.equal(parsed.livingArea, null);
+    assert.equal(parsed.kitchenArea, null);
+    assert.equal(parsed.rooms, null);
+    fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('address matching treats compact and explicit corpus notation as equal', () => {
+    const report = runComparison({
+        site: [record('site', {
+            contractNumber: null,
+            address: 'Октябрьская, 16к2'
+        })],
+        ilvo: [record('ilvo', {
+            contractNumber: null,
+            address: 'Октябрьская, 16, корпус 2'
+        })],
+        kufar: [],
+        contracts: [],
+        includeContractRegistry: false
+    });
+
+    assert.equal(report.objects.length, 1);
+    assert.equal(report.objects[0].matchedBy, 'address_price');
+});
+
 test('missing deal type is not reported as a mismatch', () => {
     const report = comparison({
         ilvo: { dealType: null, description: 'Аренда упомянута в примечании' }

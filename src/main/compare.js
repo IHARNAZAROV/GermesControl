@@ -13,7 +13,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 10;
+const REPORT_MATCHING_VERSION = 11;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
