@@ -162,6 +162,13 @@ function listingStatusPriority(status) {
     return { active: 0, inactive: 1, sold: 2 }[status] || 0;
 }
 
+function isSoldSiteRecord(record) {
+    return record && (
+        record.status === 'sold'
+        || (record.status && typeof record.status === 'object' && record.status.type === 'sold')
+    );
+}
+
 /**
  * Свернуть повторные строки внутри одного источника до сопоставления
  * источников между собой. В выгрузках ILVO один объект может встречаться
@@ -473,7 +480,7 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         // Статус sold на сайте определяет снятие объекта с продажи. Для
         // ILVO API отдельный inactive означает, что запись удалена/неактивна
         // в CRM, поэтому её не следует считать активным пропуском на площадке.
-        const soldRecord = s?.status === 'sold' ? s : null;
+        const soldRecord = isSoldSiteRecord(s) ? s : null;
         const inactiveRecord = !soldRecord && i?.status === 'inactive' ? i : null;
         const lifecycleRecords = [soldRecord, inactiveRecord].filter(Boolean);
         const listingStatus = soldRecord ? 'sold' : inactiveRecord ? 'inactive' : 'active';
@@ -496,26 +503,30 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             ['ilvo', 'kufar', i, k]
         ];
 
-        for (const field of COMPARABLE_FIELDS) {
-            const values = { site: s ? s[field.key] : undefined, ilvo: i ? i[field.key] : undefined, kufar: k ? k[field.key] : undefined };
-            let mismatch = false;
-            // ILVO is the source of truth for prices. Do not compare the
-            // website directly with Kufar: each external price must be
-            // checked against the ILVO price instead.
-            const comparisonPairs = ['price', 'priceUsd'].includes(field.key)
-                ? (i ? [
-                    ['site', 'ilvo', s, i],
-                    ['ilvo', 'kufar', i, k]
-                ] : [])
-                : pairs;
-            for (const [srcA, srcB, recA, recB] of comparisonPairs) {
-                if (recA && recB && fieldsDiffer(recA[field.key], recB[field.key], field)) mismatch = true;
-            }
-            if (mismatch) {
-                fieldDiffs.push({ field: field.key, label: field.label, values, unit: field.unit || null });
-                const errType = MISMATCH_TYPE_BY_FIELD[field.key] || ERROR_TYPES.OTHER;
-                if (!errors.some((e) => e.type === errType && e.target === target)) {
-                    pushError(errType, `${field.label}: значения расходятся между источниками`, target, 'Сайт / ILVO / Kufar');
+        // Проданный объект остаётся в реестре и статистике, но его данные
+        // больше не проверяются: он уже не является активным объявлением.
+        if (listingStatus !== 'sold') {
+            for (const field of COMPARABLE_FIELDS) {
+                const values = { site: s ? s[field.key] : undefined, ilvo: i ? i[field.key] : undefined, kufar: k ? k[field.key] : undefined };
+                let mismatch = false;
+                // ILVO is the source of truth for prices. Do not compare the
+                // website directly with Kufar: each external price must be
+                // checked against the ILVO price instead.
+                const comparisonPairs = ['price', 'priceUsd'].includes(field.key)
+                    ? (i ? [
+                        ['site', 'ilvo', s, i],
+                        ['ilvo', 'kufar', i, k]
+                    ] : [])
+                    : pairs;
+                for (const [srcA, srcB, recA, recB] of comparisonPairs) {
+                    if (recA && recB && fieldsDiffer(recA[field.key], recB[field.key], field)) mismatch = true;
+                }
+                if (mismatch) {
+                    fieldDiffs.push({ field: field.key, label: field.label, values, unit: field.unit || null });
+                    const errType = MISMATCH_TYPE_BY_FIELD[field.key] || ERROR_TYPES.OTHER;
+                    if (!errors.some((e) => e.type === errType && e.target === target)) {
+                        pushError(errType, `${field.label}: значения расходятся между источниками`, target, 'Сайт / ILVO / Kufar');
+                    }
                 }
             }
         }
@@ -525,7 +536,7 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             .map(recordContractKey)
             .find(Boolean) || null;
         const presentSourcesCount = [presence.site, presence.ilvo, presence.kufar].filter(Boolean).length;
-        if (!contractNumber && presentSourcesCount > 0) {
+        if (listingStatus !== 'sold' && !contractNumber && presentSourcesCount > 0) {
             pushError(ERROR_TYPES.NO_CONTRACT, 'У объекта не указан номер договора', target, presence.site ? 'Сайт' : (presence.ilvo ? 'ILVO' : 'Kufar'));
         }
         // Расхождение номера договора между источниками: номера не совпадают
@@ -535,7 +546,7 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         const hasMissingContractInGroup = presentSourcesCount > 1
             && contractValues.length > 0
             && contractValues.length < presentSourcesCount;
-        if (uniqueContracts.size > 1 || hasMissingContractInGroup) {
+        if (listingStatus !== 'sold' && (uniqueContracts.size > 1 || hasMissingContractInGroup)) {
             const description = uniqueContracts.size > 1
                 ? 'Номер договора отличается между источниками'
                 : 'Номер договора указан не во всех источниках';
@@ -545,7 +556,7 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
                 target,
                 contractSourceLabel({ site: recordContractNumber(s), ilvo: recordContractNumber(i), kufar: recordContractNumber(k) })
             );
-        } else if (uniqueContracts.size === 1) {
+        } else if (listingStatus !== 'sold' && uniqueContracts.size === 1) {
             const contractForms = { site: recordContractNumber(s), ilvo: recordContractNumber(i), kufar: recordContractNumber(k) };
             const uniqueSeparators = new Set(Object.values(contractForms)
                 .filter(hasRecordValue)
@@ -578,7 +589,7 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         }
 
         const hasMissingSource = listingStatus === 'active' && presentSourcesCount < 3;
-        let status = hasMissingSource ? 'missing' : 'ok';
+        let status = listingStatus === 'sold' ? 'ok' : (hasMissingSource ? 'missing' : 'ok');
         // Любая ошибка, относящаяся к этой карточке, должна отражаться
         // в её статусе, а не только расхождения полей из COMPARABLE_FIELDS.
         const hasObjectErrors = errors.some((error) => (

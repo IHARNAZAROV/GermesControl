@@ -229,3 +229,27 @@ test('inactive ILVO records do not create missing active listing errors', () => 
     assert.equal(report.categories.missingKufar, 0);
     assert.equal(report.errors.some((error) => error.type === ERROR_TYPES.MISSING_KUFAR), false);
 });
+
+test('sold website objects do not create comparison or contract errors', () => {
+    const report = runComparison({
+        site: [record('site', {
+            status: 'sold',
+            livingArea: 72,
+            contractNumber: '38/1'
+        })],
+        ilvo: [record('ilvo', {
+            livingArea: 70,
+            contractNumber: '38-1'
+        })],
+        kufar: [],
+        contracts: [],
+        includeContractRegistry: false
+    });
+
+    assert.equal(report.objects.length, 1);
+    assert.equal(report.objects[0].listingStatus, 'sold');
+    assert.equal(report.objects[0].status, 'ok');
+    assert.equal(report.objects[0].fieldDiffs.length, 0);
+    assert.equal(report.errors.some((error) => error.target === report.objects[0].objectNumber), false);
+    assert.equal(report.stats.problemsCount, 0);
+});
