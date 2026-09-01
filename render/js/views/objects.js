@@ -360,6 +360,7 @@ function showObjectDetail(obj) {
 
     openModal({
         title: `Объект №${obj.objectNumber}`,
+        kicker: 'Карточка объекта',
         body: [body],
         footer: [
             el('button', { class: 'btn btn-secondary', type: 'button', onclick: closeModal }, [

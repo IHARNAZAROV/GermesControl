@@ -33,7 +33,7 @@ export async function runCheckWithProgress(onDone) {
         el('div', { id: 'check-result' })
     ];
 
-    openModal({ title: 'Проверка данных', width: '420px', body });
+    openModal({ title: 'Проверка данных', kicker: 'Контроль качества', width: '420px', body });
 
     for (let i = 0; i < stepNodes.length; i++) {
         await wait(180);

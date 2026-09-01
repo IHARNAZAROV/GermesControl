@@ -263,27 +263,28 @@ table.data-table--objects td[data-column-key="status"] .badge {
 /* ---------- Modal ---------- */
 .modal-box {
     background: var(--color-white);
-    border-radius: 20px;
-    box-shadow: var(--shadow-md);
+    border: 1px solid rgba(20, 82, 62, 0.12);
+    border-radius: 24px;
+    box-shadow: 0 28px 80px rgba(7, 34, 24, 0.24), 0 8px 24px rgba(7, 34, 24, 0.08);
     width: 480px;
     max-width: 92vw;
-    max-height: 86vh;
-    max-width: 100%;
+    max-height: 90vh;
     min-width: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    animation: modalEnter 0.22s ease-out both;
 }
-.modal-header { padding: 18px 22px; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; }
-.modal-header h3 { font-size: 16px; font-weight: 700; }
+.modal-header { padding: 20px 24px 18px; border-bottom: 1px solid rgba(20, 82, 62, 0.09); background: linear-gradient(135deg, #FFFFFF 0%, #F8FCF9 100%); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.modal-header h3 { margin-top: 3px; color: var(--color-primary-dark); font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
 .modal-header-title { min-width: 0; }
 .modal-header-kicker {
     display: block;
     margin-bottom: 2px;
     color: var(--color-primary);
-    font-size: 9px;
+    font-size: 9.5px;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 1.05px;
     line-height: 1.2;
     text-transform: uppercase;
 }
@@ -295,17 +296,26 @@ table.data-table--objects td[data-column-key="status"] .badge {
     justify-content: center;
     padding: 0;
     border: 1px solid transparent;
-    border-radius: 10px;
-    background: transparent;
+    border-radius: 50%;
+    background: #F1F6F3;
     color: var(--color-text-secondary);
     font: inherit;
-    font-size: 17px;
+    font-size: 18px;
     cursor: pointer;
-    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
-.modal-close:hover { background: var(--color-surface-mint); color: var(--color-primary-dark); transform: rotate(4deg); }
-.modal-body { padding: 20px 22px; overflow-y: auto; min-width: 0; }
-.modal-footer { padding: 14px 22px; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 10px; }
+.modal-close:hover { background: var(--color-surface-mint); color: var(--color-primary-dark); transform: rotate(4deg); box-shadow: 0 0 0 4px rgba(20, 82, 62, 0.08); }
+.modal-body { padding: 22px 24px 24px; overflow-y: auto; min-width: 0; background: #FBFDFC; }
+.modal-footer { padding: 14px 24px; border-top: 1px solid rgba(20, 82, 62, 0.09); background: #FFFFFF; display: flex; justify-content: flex-end; gap: 10px; }
+
+@keyframes modalEnter {
+    from { opacity: 0; transform: translateY(8px) scale(0.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modal-box { animation: none; }
+}
 
 /* ---------- Toast ---------- */
 .toast { padding: 12px 16px; border-radius: var(--radius-md); background: var(--color-primary-dark); color: #fff; font-size: 13px; box-shadow: var(--shadow-md); min-width: 220px; }

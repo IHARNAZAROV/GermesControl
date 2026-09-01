@@ -50,6 +50,32 @@ function formatFieldValue(value, field) {
     return String(value);
 }
 
+function normalizedComparisonValue(value) {
+    if (!hasValue(value)) return '__empty__';
+    const numericValue = Number(String(value).replace(',', '.'));
+    if (Number.isFinite(numericValue)) return `number:${numericValue}`;
+    return `text:${String(value).trim().toLocaleLowerCase('ru-RU')}`;
+}
+
+function comparisonValueState(values, source, field) {
+    const entries = Object.entries(values).filter(([, value]) => hasValue(value));
+    if (entries.length < 2) return 'is-neutral';
+
+    const currentKey = normalizedComparisonValue(values[source]);
+    if (['price', 'priceUsd'].includes(field) && hasValue(values.ilvo)) {
+        if (source === 'ilvo') return 'is-reference';
+        return currentKey === normalizedComparisonValue(values.ilvo) ? 'is-consistent' : 'is-different';
+    }
+
+    const counts = new Map();
+    entries.forEach(([, value]) => {
+        const key = normalizedComparisonValue(value);
+        counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const maxCount = Math.max(...counts.values());
+    return counts.get(currentKey) === maxCount && maxCount > 1 ? 'is-consistent' : 'is-different';
+}
+
 function findErrorObject(error, report) {
     if (!report || error.targetType === 'contract') return null;
     const objects = report.objects || [];
@@ -86,16 +112,27 @@ function comparisonBlock(diff) {
     const sourceOrder = isPrice ? ['ilvo', 'site', 'kufar'] : ['site', 'ilvo', 'kufar'];
     const rows = sourceOrder
         .filter((source) => Object.prototype.hasOwnProperty.call(values, source))
-        .map((source) => el('div', { class: 'error-value-row' }, [
+        .map((source) => {
+            const valueState = comparisonValueState(values, source, diff.field);
+            return el('div', { class: `error-value-row ${valueState}` }, [
             el('span', { class: 'error-value-source' }, SOURCE_LABELS[source]),
-            el('span', { class: 'error-value-value' }, formatFieldValue(values[source], diff.field)),
-            isPrice && source === 'ilvo'
-                ? el('span', { class: 'badge badge-success error-reference-badge' }, 'Эталон')
+            el('span', { class: 'error-value-value' }, [
+                valueState === 'is-different'
+                    ? el('span', { class: 'error-value-alert', 'aria-hidden': 'true' }, '!')
+                    : null,
+                formatFieldValue(values[source], diff.field)
+            ]),
+            valueState === 'is-reference'
+                ? el('span', { class: 'badge badge-success error-reference-badge' }, 'Эталон ILVO')
                 : null
-        ]));
+            ]);
+        });
 
     return el('div', { class: 'error-comparison-block' }, [
-        el('div', { class: 'error-comparison-title' }, diff.label),
+        el('div', { class: 'error-comparison-title' }, [
+            el('span', {}, diff.label),
+            el('span', { class: 'error-comparison-hint' }, isPrice ? 'ILVO — эталон' : 'сравнение источников')
+        ]),
         el('div', { class: 'error-value-list' }, rows)
     ]);
 }
@@ -247,9 +284,11 @@ function openErrorDetails(error, report) {
 
     openModal({
         title: 'Подробности ошибки',
+        kicker: 'Центр ошибок',
         body,
         footer: [el('button', { class: 'btn btn-primary', onclick: closeModal }, 'Понятно')],
-        width: '680px'
+        width: '720px',
+        className: 'error-modal'
     });
 }
 

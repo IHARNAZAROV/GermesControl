@@ -1,6 +1,6 @@
 import { el } from '../format.js';
 
-export function openModal({ title, body, footer, width, className = '' }) {
+export function openModal({ title, body, footer, width, className = '', kicker = 'Информация' }) {
     const root = document.getElementById('modal-root');
     if (root._escHandler) document.removeEventListener('keydown', root._escHandler);
     root.innerHTML = '';
@@ -14,7 +14,7 @@ export function openModal({ title, body, footer, width, className = '' }) {
     }, [
         el('div', { class: 'modal-header' }, [
             el('div', { class: 'modal-header-title' }, [
-                el('span', { class: 'modal-header-kicker' }, 'Карточка объекта'),
+                el('span', { class: 'modal-header-kicker' }, kicker),
                 el('h3', { id: titleId }, title)
             ]),
             el('button', {

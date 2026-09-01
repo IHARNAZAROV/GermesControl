@@ -145,6 +145,7 @@ export function openImportModal() {
 
     openModal({
         title: 'Загрузить данные',
+        kicker: 'Источники данных',
         width: '720px',
         body: [
             el('p', { class: 'card-subtitle', style: 'margin-bottom:16px;' }, 'Сайт ГермесГарант и ILVO можно обновить по API, а остальные источники загружаются вручную. После обновления источников запустите проверку, чтобы обновить сводку.'),
