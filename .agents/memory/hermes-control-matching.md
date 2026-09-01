@@ -126,6 +126,21 @@ straight from `<re_contract>` (reliable). Explicit `<address>` tags are rare
 (never from `<body>`, which always ends in the agency's own boilerplate
 office address that would otherwise get misread as the listing's address).
 
+### Subject street abbreviations
+Kufar subjects can abbreviate a street with an initial and include the house
+or corpus after the street, for example `по ул. Л. Чайкиной` or
+`по ул. Машерова,23 корп.1`. The extractor must preserve periods inside the
+street name and must not stop at the first punctuation mark.
+
+**Why:** the first implementation treated the period after `Л.` as the end
+of the address and returned only `ул. Л`, producing a false address mismatch
+against the full site/ILVO address.
+
+**How to apply:** extract the full subject suffix after `ул.`/`улица` (also
+supporting `на улице` and a standalone street marker), trim only terminal
+punctuation/parentheticals, and let address comparison accept a one-letter
+street initial when the remaining tokens agree.
+
 ## Demo data must not leak into imports
 The initial demo state includes a synthetic contract registry so the contract
 checks have examples immediately. A real source import must clear demo sources,

@@ -501,9 +501,15 @@ function extractKufarLocationFromSubject(subject) {
         const m = subject.match(re);
         if (m) { city = m[1]; break; }
     }
-    const streetMatch = subject.match(/по\s+улиц[аеы]\s+([А-ЯЁа-яё0-9\-\s]+?)(?:[,.]|$)/i)
-        || subject.match(/по\s+ул\.\s*([А-ЯЁа-яё0-9\-\s]+?)(?:[,.]|$)/i);
-    const address = streetMatch ? `ул. ${streetMatch[1].trim()}` : null;
+    // Точка после инициала не является концом адреса:
+    // «ул. Л. Чайкиной» нельзя обрезать до «ул. Л». Также сохраняем
+    // номер дома и корпус после улицы («Машерова,23 корп.1»).
+    const streetMatch = subject.match(
+        /(?:^|[\s,])(?:(?:по|на)\s+)?(?:ул\.?|улиц[а-яё]*)\s+(.+)$/iu
+    );
+    const address = streetMatch
+        ? `ул. ${streetMatch[1].trim().replace(/\s*\([^)]*\)\s*$/u, '').replace(/[.;]+\s*$/u, '').trim()}`
+        : null;
     return { city, address };
 }
 

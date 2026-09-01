@@ -7,7 +7,7 @@ const path = require('node:path');
 const test = require('node:test');
 const XLSX = require('xlsx');
 
-const { parseIlvoXlsx, parseIlvoApiEvents } = require('../src/main/parsers');
+const { parseIlvoXlsx, parseIlvoApiEvents, parseKufarXml } = require('../src/main/parsers');
 const { runComparison } = require('../src/main/compare');
 const { ERROR_TYPES, normalizeDealType } = require('../src/main/schema');
 
@@ -221,6 +221,53 @@ test('address matching treats compact and explicit corpus notation as equal', ()
 
     assert.equal(report.objects.length, 1);
     assert.equal(report.objects[0].matchedBy, 'address_price');
+});
+
+test('Kufar keeps initials, house number, and corpus in the subject address', async () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+        <uedb><records><record>
+            <unid>27e37ed3-1d58-4d43-9f6b-81d715a4f226</unid>
+            <subject><![CDATA[Продажа квартиры в доме по ул. Л. Чайкиной]]></subject>
+            <type>sell</type><price>103950</price><currency>BYN</currency>
+            <category>1010</category><rooms>4</rooms><size>63.6</size>
+            <re_contract>№59/1 от 10.08.2026</re_contract>
+        </record><record>
+            <unid>second</unid>
+            <subject><![CDATA[3-к квартир по ул. Машерова,23 корп.1]]></subject>
+            <type>sell</type><price>1</price><currency>BYN</currency><category>1010</category>
+        </record></records></uedb>`;
+
+    const records = await parseKufarXml(xml, true);
+    assert.equal(records[0].address, 'ул. Л. Чайкиной');
+    assert.equal(records[1].address, 'ул. Машерова,23 корп.1');
+});
+
+test('Kufar abbreviated street names do not create an address mismatch', async () => {
+    const [kufar] = await parseKufarXml(`<uedb><records><record>
+        <unid>27e37ed3-1d58-4d43-9f6b-81d715a4f226</unid>
+        <subject><![CDATA[Продажа квартиры в доме по ул. Л. Чайкиной]]></subject>
+        <type>sell</type><price>103950</price><currency>BYN</currency><category>1010</category>
+        <rooms>4</rooms><size>63.6</size><re_contract>№59/1 от 10.08.2026</re_contract>
+    </record></records></uedb>`, true);
+    const report = runComparison({
+        site: [record('site', {
+            address: 'ул. Лизы Чайкиной, 4',
+            contractNumber: '59/1',
+            type: 'Квартира',
+            rooms: 4,
+            totalArea: 63.6,
+            livingArea: 28.5,
+            kitchenArea: 12.2,
+            price: 103950
+        })],
+        ilvo: [],
+        kufar: [kufar],
+        contracts: [],
+        includeContractRegistry: false
+    });
+
+    assert.equal(report.objects.length, 1);
+    assert.equal(report.objects[0].fieldDiffs.some((diff) => diff.field === 'address'), false);
 });
 
 test('missing deal type is not reported as a mismatch', () => {

@@ -32,6 +32,19 @@ function isSubsetMatch(a, b) {
     return true;
 }
 
+function isFuzzyAddressSubsetMatch(a, b) {
+    if (a.size === 0 || b.size === 0) return false;
+    const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+    for (const token of small) {
+        if ([...big].some((candidate) => candidate === token
+            || (token.length === 1 && /^[a-zа-яё]$/iu.test(token) && candidate.startsWith(token)))) {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
 function hasAddressNumber(value) {
     return /\d/.test(String(value || ''));
 }
@@ -73,7 +86,7 @@ function fieldsDiffer(a, b, field) {
         const cb = cleanLocationText(b);
         const ta = tokenSet(ca);
         const tb = tokenSet(cb);
-        if (isSubsetMatch(ta, tb)) return false;
+        if (isFuzzyAddressSubsetMatch(ta, tb)) return false;
         // Тот же адрес, но с иным пробелом внутри номера дома/корпуса
         // (например, "16к2" против "16к 2") — сравниваем без пробелов вовсе.
         if (hasAddressNumber(ca) && hasAddressNumber(cb) && compactContains(ca, cb)) return false;
@@ -324,7 +337,7 @@ function addressMatches(a, b) {
 
     const tokensA = tokenSet(addressA);
     const tokensB = tokenSet(addressB);
-    if (isSubsetMatch(tokensA, tokensB)) return true;
+    if (isFuzzyAddressSubsetMatch(tokensA, tokensB)) return true;
 
     // Учитываем варианты вроде «16к2» и «16к 2», а также короткую
     // запись улицы относительно полного адреса.
