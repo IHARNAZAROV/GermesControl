@@ -1,7 +1,7 @@
-import { el, formatMoney, formatShortDate } from '../format.js';
+import { el, formatMoney, formatShortDate, icon, sourceLogo } from '../format.js';
 import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
-import { openModal } from '../components/modal.js';
+import { openModal, closeModal } from '../components/modal.js';
 
 function presenceChip(present, label) {
     return el('span', { class: `presence-chip ${present ? 'ok' : 'no'}`, title: label }, present ? '\u2713' : '\u00D7');
@@ -51,97 +51,288 @@ function matchBasis(obj) {
 
 function renderObjectPhotos(obj) {
     const photos = Array.isArray(obj.photos) ? obj.photos.filter(Boolean) : [];
-    const gallery = el('div', { class: 'object-photo-gallery' });
+    const gallery = el('div', {
+        class: 'object-photo-gallery object-photo-gallery-interactive',
+        tabindex: photos.length ? '0' : '-1',
+        'aria-label': 'Галерея фотографий объекта'
+    });
 
     if (!photos.length) {
-        gallery.appendChild(el('div', { class: 'object-photo-empty' }, 'Фотография в загруженных данных не найдена'));
+        gallery.appendChild(el('div', { class: 'object-photo-empty' }, [
+            el('span', { class: 'object-photo-empty-icon' }, [icon('building', 22)]),
+            el('strong', {}, 'Фотографии не загружены'),
+            el('span', {}, 'В текущих выгрузках нет изображений этого объекта')
+        ]));
         return gallery;
     }
 
-    photos.slice(0, 6).forEach((url, index) => {
-        const frame = el('figure', { class: 'object-photo-frame' });
-        const image = el('img', {
-            src: url,
-            alt: `${obj.title || 'Объект недвижимости'} — фото ${index + 1}`,
-            loading: 'lazy',
-            referrerpolicy: 'no-referrer'
-        });
-        const fallback = el('div', { class: 'object-photo-fallback' }, 'Фото недоступно');
-        fallback.hidden = true;
-        image.addEventListener('error', () => {
-            image.hidden = true;
-            fallback.hidden = false;
-            frame.classList.add('is-unavailable');
-        });
-        frame.append(image, fallback);
-        gallery.appendChild(frame);
+    const visiblePhotos = photos.slice(0, 12);
+    let activeIndex = 0;
+    const mainFrame = el('figure', { class: 'object-photo-main' });
+    const mainImage = el('img', {
+        src: visiblePhotos[0],
+        alt: `${obj.title || 'Объект недвижимости'} — фото 1`,
+        referrerpolicy: 'no-referrer'
     });
+    const mainFallback = el('div', { class: 'object-photo-fallback' }, [
+        el('span', { class: 'object-photo-fallback-icon' }, [icon('building', 24)]),
+        el('span', {}, 'Фото недоступно')
+    ]);
+    mainFallback.hidden = true;
+    const counter = el('span', { class: 'object-photo-counter' }, `1 / ${visiblePhotos.length}`);
+    const previousButton = el('button', {
+        class: 'object-photo-nav object-photo-nav-prev',
+        type: 'button',
+        'aria-label': 'Предыдущее фото',
+        disabled: visiblePhotos.length < 2
+    }, '\u2039');
+    const nextButton = el('button', {
+        class: 'object-photo-nav object-photo-nav-next',
+        type: 'button',
+        'aria-label': 'Следующее фото',
+        disabled: visiblePhotos.length < 2
+    }, '\u203A');
+
+    mainImage.addEventListener('error', () => {
+        mainImage.hidden = true;
+        mainFallback.hidden = false;
+        mainFrame.classList.add('is-unavailable');
+    });
+    mainImage.addEventListener('load', () => {
+        mainImage.hidden = false;
+        mainFallback.hidden = true;
+        mainFrame.classList.remove('is-unavailable');
+    });
+    mainFrame.append(
+        mainImage,
+        mainFallback,
+        el('div', { class: 'object-photo-main-overlay' }, [counter]),
+        previousButton,
+        nextButton
+    );
+
+    const thumbs = el('div', { class: 'object-photo-thumbs' });
+    const thumbButtons = visiblePhotos.map((url, index) => {
+        const button = el('button', {
+            class: `object-photo-thumb${index === 0 ? ' is-active' : ''}`,
+            type: 'button',
+            'aria-label': `Открыть фото ${index + 1}`,
+            'aria-pressed': index === 0 ? 'true' : 'false'
+        }, [
+            el('img', {
+                src: url,
+                alt: '',
+                loading: 'lazy',
+                referrerpolicy: 'no-referrer'
+            })
+        ]);
+        button.addEventListener('click', () => setActivePhoto(index));
+        return button;
+    });
+    thumbs.append(...thumbButtons);
+
+    function setActivePhoto(nextIndex) {
+        activeIndex = (nextIndex + visiblePhotos.length) % visiblePhotos.length;
+        mainImage.src = visiblePhotos[activeIndex];
+        mainImage.alt = `${obj.title || 'Объект недвижимости'} — фото ${activeIndex + 1}`;
+        counter.textContent = `${activeIndex + 1} / ${visiblePhotos.length}`;
+        thumbButtons.forEach((button, index) => {
+            const isActive = index === activeIndex;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', String(isActive));
+        });
+    }
+
+    previousButton.addEventListener('click', () => setActivePhoto(activeIndex - 1));
+    nextButton.addEventListener('click', () => setActivePhoto(activeIndex + 1));
+    gallery.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowLeft') setActivePhoto(activeIndex - 1);
+        if (event.key === 'ArrowRight') setActivePhoto(activeIndex + 1);
+    });
+
+    gallery.append(mainFrame, thumbs);
 
     return gallery;
 }
 
-function showObjectDetail(obj) {
-    const rows = [
-        ['№ объекта', obj.objectNumber],
-        ['Название', obj.title],
-        ['Тип', obj.type],
-        ['Тип сделки', obj.dealType],
-        ['Город', obj.city],
-        ['Адрес', obj.address],
-        ['Цена', formatMoney(obj.price, 'BYN')],
-        ['Цена USD', formatMoney(obj.priceUsd, 'USD')],
-        ['Комнат', obj.rooms],
-        ['Общая площадь', formatMoney(obj.totalArea, 'м²')],
-        ['Жилая площадь', formatMoney(obj.livingArea, 'м²')],
-        ['Площадь кухни', formatMoney(obj.kitchenArea, 'м²')],
-        ['Этаж', `${obj.floor ?? '—'} / ${obj.floors ?? '—'}`],
-        ['Договор', obj.contractNumber || '—'],
-        ['Статус размещения', obj.listingStatus === 'sold'
-            ? 'Снят с продажи'
-            : obj.listingStatus === 'inactive' ? 'Неактивен в ILVO' : 'Активен'],
-        ['Дата снятия с продажи', obj.listingStatusDate ? formatShortDate(obj.listingStatusDate) : '—']
-    ];
+function detailItem(label, value, className = '') {
+    return el('div', { class: `object-detail-item${className ? ` ${className}` : ''}` }, [
+        el('span', { class: 'object-detail-label' }, label),
+        el('strong', { class: 'object-detail-value' }, String(value ?? '—'))
+    ]);
+}
 
-    const body = [
-        el('div', { class: 'object-photo-section' }, [
-            el('div', { class: 'card-title' }, 'Фотографии объекта'),
-            renderObjectPhotos(obj)
-        ]),
-        el('div', { class: 'matching-explanation' }, [
-            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-bottom:4px;' }, 'Основание объединения'),
-            matchBasis(obj),
-            el('div', { class: 'text-secondary', style: 'font-size:11.5px;margin-top:8px;' }, 'Записи объединяются по нормализованному номеру договора и адресу. Исходные номера источников сохраняются для контроля формата.')
-        ]),
-        el('div', { class: 'object-detail-grid' },
-            rows.map(([label, value]) => el('div', {}, [
-                el('div', { class: 'text-secondary', style: 'font-size:11.5px;' }, label),
-                el('div', { style: 'font-weight:600;font-size:13px;' }, String(value ?? '—'))
-            ]))
-        ),
-        el('div', { class: 'presence-list' }, [
-            presenceChip(obj.presence.site, 'Сайт'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'Сайт'),
-            presenceChip(obj.presence.ilvo, 'ILVO'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'ILVO'),
-            presenceChip(obj.presence.kufar, 'Kufar'), el('span', { class: 'text-secondary', style: 'font-size:12px;' }, 'Kufar')
+function sourceStatusRow(source, label, present) {
+    return el('div', { class: `object-source-row ${present ? 'is-present' : 'is-missing'}` }, [
+        el('span', { class: 'object-source-logo' }, [sourceLogo(source)]),
+        el('span', { class: 'object-source-name' }, label),
+        el('span', { class: 'object-source-state' }, [
+            el('span', { class: 'object-source-dot' }),
+            present ? 'Найдено' : 'Нет записи'
         ])
-    ];
+    ]);
+}
 
-    if (obj.fieldDiffs && obj.fieldDiffs.length) {
-        body.push(el('div', { class: 'card-title', style: 'margin-bottom:8px;' }, 'Расхождения'));
-        obj.fieldDiffs.forEach((d) => {
-            body.push(el('div', { class: 'field-diff-card' }, [
-                el('div', { class: 'field-name' }, d.label),
-                el('div', { class: 'field-diff-values' }, ['site', 'ilvo', 'kufar'].map((src) =>
-                    d.values[src] !== undefined ? el('div', { class: 'fv' }, [
-                        el('span', { class: 'src' }, src === 'site' ? 'Сайт:' : src === 'ilvo' ? 'ILVO:' : 'Kufar:'),
-                        formatMoney(d.values[src], d.unit)
-                    ]) : null
-                )),
-                el('div', { class: 'badge badge-warning', style: 'margin-top:8px;' }, '\u26A0 Значения отличаются')
-            ]));
-        });
+function renderObjectSources(obj) {
+    return el('div', { class: 'object-source-list' }, [
+        sourceStatusRow('site', 'Сайт ГермесГарант', obj.presence.site),
+        sourceStatusRow('ilvo', 'ILVO CRM', obj.presence.ilvo),
+        sourceStatusRow('kufar', 'Kufar', obj.presence.kufar)
+    ]);
+}
+
+function renderObjectDiffs(obj) {
+    if (!obj.fieldDiffs || !obj.fieldDiffs.length) {
+        return el('div', { class: 'object-clean-state' }, [
+            el('span', { class: 'object-clean-icon' }, [icon('check', 17)]),
+            el('div', {}, [
+                el('strong', {}, 'Расхождений не найдено'),
+                el('span', {}, 'Значения по доступным источникам совпадают')
+            ])
+        ]);
     }
 
-    openModal({ title: obj.title || `Объект №${obj.objectNumber}`, body, width: '560px' });
+    return el('div', { class: 'object-diff-list' }, obj.fieldDiffs.map((d) =>
+        el('div', { class: 'field-diff-card' }, [
+            el('div', { class: 'field-name' }, [
+                el('span', { class: 'object-diff-marker' }),
+                d.label
+            ]),
+            el('div', { class: 'field-diff-values' }, ['site', 'ilvo', 'kufar'].map((src) =>
+                d.values[src] !== undefined ? el('div', { class: 'fv' }, [
+                    el('span', { class: 'src' }, src === 'site' ? 'Сайт' : src === 'ilvo' ? 'ILVO' : 'Kufar'),
+                    el('strong', {}, formatMoney(d.values[src], d.unit))
+                ]) : null
+            )),
+            el('span', { class: 'badge badge-warning' }, '\u26A0 Значения отличаются')
+        ])
+    ));
+}
+
+function showObjectDetail(obj) {
+    const sourceCount = Object.values(obj.presence || {}).filter(Boolean).length;
+    const price = formatObjectPrice(obj);
+    const status = statusBadge(obj.status, obj.listingStatus, obj.listingStatusDate);
+    const listingNote = obj.listingStatus === 'sold'
+        ? `Снят с продажи${obj.listingStatusDate ? ` · ${formatShortDate(obj.listingStatusDate)}` : ''}`
+        : obj.listingStatus === 'inactive' ? 'Неактивен в ILVO' : 'Активное размещение';
+
+    const body = el('div', { class: 'object-detail-shell' }, [
+        el('section', { class: 'object-detail-hero' }, [
+            renderObjectPhotos(obj),
+            el('div', { class: 'object-hero-summary' }, [
+                el('div', { class: 'object-hero-topline' }, [
+                    el('span', { class: 'object-eyebrow' }, `ОБЪЕКТ №${obj.objectNumber}`),
+                    status
+                ]),
+                el('h2', { class: 'object-hero-title' }, obj.title || `Объект №${obj.objectNumber}`),
+                el('div', { class: 'object-hero-location' }, [
+                    icon('building', 16),
+                    el('span', {}, [obj.city, obj.address].filter(Boolean).join(', ') || 'Адрес не указан')
+                ]),
+                el('div', { class: 'object-hero-price' }, [
+                    el('strong', {}, price),
+                    obj.price && obj.priceUsd
+                        ? el('span', {}, formatMoney(obj.priceUsd, 'USD'))
+                        : null
+                ]),
+                el('div', { class: 'object-quick-stats' }, [
+                    detailItem('Площадь', formatMoney(obj.totalArea, 'м²')),
+                    detailItem('Комнаты', obj.rooms || '—'),
+                    detailItem('Этаж', obj.floor ? `${obj.floor} / ${obj.floors ?? '—'}` : '—')
+                ]),
+                el('div', { class: 'object-hero-note' }, [
+                    el('span', { class: 'object-hero-note-dot' }),
+                    el('span', {}, listingNote)
+                ])
+            ])
+        ]),
+        el('div', { class: 'object-detail-content' }, [
+            el('main', { class: 'object-detail-main' }, [
+                el('section', { class: 'object-info-section' }, [
+                    el('div', { class: 'object-section-heading' }, [
+                        el('div', {}, [
+                            el('span', { class: 'object-section-kicker' }, 'Обзор'),
+                            el('h3', {}, 'Характеристики объекта')
+                        ]),
+                        obj.dealType ? el('span', { class: 'object-deal-tag' }, obj.dealType) : null
+                    ]),
+                    el('div', { class: 'object-spec-grid' }, [
+                        detailItem('Тип объекта', obj.type),
+                        detailItem('Город', obj.city),
+                        detailItem('Адрес', obj.address),
+                        detailItem('Жилая площадь', formatMoney(obj.livingArea, 'м²')),
+                        detailItem('Площадь кухни', formatMoney(obj.kitchenArea, 'м²')),
+                        detailItem('Этажность', obj.floors ? `${obj.floors} этажей` : '—'),
+                        detailItem('Договор', obj.contractNumber || 'Не указан', obj.contractNumber ? '' : 'is-warning'),
+                        detailItem('Размещение', listingNote)
+                    ])
+                ]),
+                obj.description ? el('section', { class: 'object-info-section object-description-section' }, [
+                    el('div', { class: 'object-section-heading' }, [
+                        el('div', {}, [
+                            el('span', { class: 'object-section-kicker' }, 'Описание'),
+                            el('h3', {}, 'Об объекте')
+                        ])
+                    ]),
+                    el('p', { class: 'object-description' }, obj.description)
+                ]) : null,
+                el('section', { class: 'object-info-section object-diffs-section' }, [
+                    el('div', { class: 'object-section-heading' }, [
+                        el('div', {}, [
+                            el('span', { class: 'object-section-kicker' }, 'Контроль качества'),
+                            el('h3', {}, obj.fieldDiffs?.length ? `Расхождения · ${obj.fieldDiffs.length}` : 'Проверка данных')
+                        ])
+                    ]),
+                    renderObjectDiffs(obj)
+                ])
+            ]),
+            el('aside', { class: 'object-detail-aside' }, [
+                el('section', { class: 'object-aside-card object-source-card' }, [
+                    el('div', { class: 'object-aside-heading' }, [
+                        el('span', { class: 'object-aside-icon' }, [icon('database', 17)]),
+                        el('div', {}, [
+                            el('h3', {}, 'Синхронизация'),
+                            el('span', {}, `${sourceCount} из 3 источников`)
+                        ])
+                    ]),
+                    renderObjectSources(obj)
+                ]),
+                el('section', { class: 'object-aside-card object-match-card' }, [
+                    el('div', { class: 'object-aside-heading' }, [
+                        el('span', { class: 'object-aside-icon' }, [icon('shield', 17)]),
+                        el('div', {}, [
+                            el('h3', {}, 'Идентификация'),
+                            el('span', {}, 'Как объединены записи')
+                        ])
+                    ]),
+                    matchBasis(obj),
+                    el('p', { class: 'object-aside-note' }, 'Система использует номер договора и адрес, чтобы сопоставить один объект в разных источниках.')
+                ]),
+                el('section', { class: 'object-aside-card object-contract-card' }, [
+                    el('span', { class: 'object-section-kicker' }, 'Номер договора'),
+                    el('strong', { class: 'object-contract-number' }, obj.contractNumber || 'Не указан'),
+                    obj.contractForms ? el('div', { class: 'object-contract-forms' },
+                        Object.entries(obj.contractForms)
+                            .filter(([, value]) => value)
+                            .map(([source, value]) => el('span', {}, `${source === 'site' ? 'Сайт' : source === 'ilvo' ? 'ILVO' : 'Kufar'}: ${value}`))
+                    ) : null
+                ])
+            ])
+        ])
+    ]);
+
+    openModal({
+        title: `Объект №${obj.objectNumber}`,
+        body: [body],
+        footer: [
+            el('button', { class: 'btn btn-secondary', type: 'button', onclick: closeModal }, [
+                icon('arrowRight', 15),
+                'Закрыть карточку'
+            ])
+        ],
+        className: 'object-modal'
+    });
 }
 
 export function renderObjects(container) {
