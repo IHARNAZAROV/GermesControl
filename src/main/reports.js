@@ -676,11 +676,22 @@ function addDrawingToSheet(sheetXml) {
 }
 
 function addChartContentTypes(contentTypesXml, chartCount) {
-    const overrides = Array.from({ length: chartCount }, (_, index) => (
-        `<Override PartName="/xl/charts/chart${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`
-    )).join('');
-    if (contentTypesXml.includes('/xl/charts/chart1.xml')) return contentTypesXml;
-    return contentTypesXml.replace('</Types>', `${overrides}</Types>`);
+    const overrides = [];
+    if (!contentTypesXml.includes('/xl/drawings/drawing1.xml')) {
+        overrides.push(
+            '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>'
+        );
+    }
+    for (let index = 0; index < chartCount; index += 1) {
+        if (!contentTypesXml.includes(`/xl/charts/chart${index + 1}.xml`)) {
+            overrides.push(
+                `<Override PartName="/xl/charts/chart${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`
+            );
+        }
+    }
+    return overrides.length > 0
+        ? contentTypesXml.replace('</Types>', `${overrides.join('')}</Types>`)
+        : contentTypesXml;
 }
 
 function generateChartPackage(chartDefinitions) {

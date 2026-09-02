@@ -82,6 +82,7 @@ test('embeds two native colored Excel charts linked to the summary', async () =>
     const chartTwo = zip.file('xl/charts/chart2.xml').asText();
     const drawing = zip.file('xl/drawings/drawing1.xml').asText();
     const sheet = zip.file('xl/worksheets/sheet1.xml').asText();
+    const contentTypes = zip.file('[Content_Types].xml').asText();
 
     assert.match(chartOne, /'Сводка'!\$A\$20:\$A\$22/u);
     assert.match(chartOne, /srgbClr val="155945"/u);
@@ -89,6 +90,7 @@ test('embeds two native colored Excel charts linked to the summary', async () =>
     assert.match(chartTwo, /srgbClr val="D97706"/u);
     assert.match(drawing, /<xdr:col>4<\/xdr:col>/u);
     assert.match(sheet, /<drawing r:id="rIdChart"\/>/u);
+    assert.match(contentTypes, /PartName="\/xl\/drawings\/drawing1\.xml" ContentType="application\/vnd\.openxmlformats-officedocument\.drawing\+xml"/u);
 
     fs.rmSync(directory, { recursive: true, force: true });
 });
