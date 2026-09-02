@@ -9,8 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     runCheck: () => ipcRenderer.invoke('app:runCheck'),
     getSettings: () => ipcRenderer.invoke('app:getSettings'),
     setSettings: (patch) => ipcRenderer.invoke('app:setSettings', patch),
-    resetSampleData: () => ipcRenderer.invoke('app:resetSampleData'),
     generateReport: (reportType, format) => ipcRenderer.invoke('app:generateReport', { reportType, format }),
-    openPath: (targetPath) => ipcRenderer.invoke('app:openPath', targetPath),
-    exportSampleFiles: () => ipcRenderer.invoke('app:exportSampleFiles')
+    openPath: (targetPath) => ipcRenderer.invoke('app:openPath', targetPath)
 });

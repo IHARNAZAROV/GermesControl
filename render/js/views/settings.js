@@ -1,5 +1,5 @@
 import { el, icon, sourceLogo } from '../format.js';
-import { store, loadState, resetSampleData } from '../state.js';
+import { store, loadState } from '../state.js';
 import { showToast } from '../components/toast.js';
 
 const APP_VERSION = '1.0.0';
@@ -223,39 +223,11 @@ export function renderSettings(container) {
         ]
     });
 
-    const demoCard = sectionCard({
-        iconName: 'spark',
-        title: 'Демо и образцы',
-        subtitle: 'Для тестирования и обучения команды',
-        className: 'settings-card-wide',
-        children: [
-            el('p', { class: 'settings-note' }, 'Скачайте примеры файлов в ожидаемом формате или восстановите демонстрационный набор с намеренными расхождениями.'),
-            el('div', { class: 'settings-actions' }, [
-                el('button', {
-                    class: 'btn btn-secondary',
-                    onclick: async () => {
-                        const res = await window.electronAPI.exportSampleFiles();
-                        if (!res.canceled) showToast(`Примеры сохранены в ${res.dir}`, 'success');
-                    }
-                }, [icon('upload', 15), 'Скачать примеры']),
-                el('button', {
-                    class: 'btn btn-ghost',
-                    onclick: async () => {
-                        await resetSampleData();
-                        showToast('Демо-данные восстановлены', 'success');
-                        document.dispatchEvent(new CustomEvent('app:refresh-view'));
-                    }
-                }, 'Восстановить демо-данные')
-            ])
-        ]
-    });
-
     const bento = el('div', { class: 'settings-bento' }, [
         profileCard,
         automationCard,
         sourcesCard,
-        storageCard,
-        demoCard
+        storageCard
     ]);
 
     container.appendChild(header);

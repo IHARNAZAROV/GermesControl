@@ -2,7 +2,6 @@
 
 const { ipcMain, dialog, shell } = require('electron');
 const path = require('path');
-const fs = require('fs-extra');
 const dayjs = require('dayjs');
 const store = require('./dataStore');
 const {
@@ -222,11 +221,6 @@ function registerIpcHandlers(getMainWindow) {
         return store.settings.store;
     });
 
-    ipcMain.handle('app:resetSampleData', async () => {
-        store.resetToSampleData();
-        return buildFullState();
-    });
-
     ipcMain.handle('app:generateReport', async (evt, { reportType, format }) => {
         const report = store.getLastReport();
         if (!report) throw new Error('Сначала запустите проверку данных.');
@@ -246,34 +240,6 @@ function registerIpcHandlers(getMainWindow) {
         await shell.showItemInFolder(targetPath);
     });
 
-    ipcMain.handle('app:exportSampleFiles', async () => {
-        const win = getMainWindow();
-        const { canceled, filePaths } = await dialog.showOpenDialog(win, {
-            title: 'Выберите папку для примеров файлов',
-            properties: ['openDirectory']
-        });
-        if (canceled || !filePaths[0]) return { canceled: true };
-        const { buildSampleDataset } = require('./sampleData');
-        const XLSX = require('xlsx');
-        const dataset = buildSampleDataset();
-        const dir = filePaths[0];
-
-        await fs.writeJson(path.join(dir, 'site.sample.json'), dataset.site, { spaces: 2 });
-
-        const ws = XLSX.utils.json_to_sheet(dataset.ilvo);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'ILVO');
-        XLSX.writeFile(wb, path.join(dir, 'ilvo.sample.xlsx'));
-
-        const fields = Object.keys(dataset.kufar[0] || {});
-        const xmlItems = dataset.kufar
-            .map((rec) => `  <offer id="${rec.id}">\n${fields.filter((f) => f !== 'id').map((f) => `    <${f}>${rec[f] ?? ''}</${f}>`).join('\n')}\n  </offer>`)
-            .join('\n');
-        const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<feed>\n${xmlItems}\n</feed>\n`;
-        await fs.writeFile(path.join(dir, 'kufar.sample.xml'), xml, 'utf-8');
-
-        return { canceled: false, dir };
-    });
 }
 
 module.exports = { registerIpcHandlers };

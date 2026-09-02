@@ -74,8 +74,3 @@ export async function runCheck() {
         notify();
     }
 }
-
-export async function resetSampleData() {
-    await window.electronAPI.resetSampleData();
-    await loadState();
-}

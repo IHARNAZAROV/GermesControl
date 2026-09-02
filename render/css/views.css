@@ -569,13 +569,13 @@
 .source-title > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .import-card .imp-file { font-size: 12.5px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .import-card .imp-count { font-size: 22px; font-weight: 800; }
-.import-actions, .settings-actions, .presence-list {
+.import-actions, .presence-list {
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
 }
-.import-actions, .settings-actions { margin-top: 4px; }
+.import-actions { margin-top: 4px; }
 .object-detail-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

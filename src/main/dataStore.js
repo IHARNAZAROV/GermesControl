@@ -192,15 +192,6 @@ function appendHistory(entry) {
     return history;
 }
 
-function resetToSampleData() {
-    ensureDirs();
-    stateCache = null;
-    fs.removeSync(STATE_FILE);
-    fs.removeSync(REPORT_FILE);
-    fs.removeSync(HISTORY_FILE);
-    return seedInitialState();
-}
-
 module.exports = {
     DATA_DIR,
     settings,
@@ -213,6 +204,5 @@ module.exports = {
     getLastReport,
     saveLastReport,
     getHistory,
-    appendHistory,
-    resetToSampleData
+    appendHistory
 };
