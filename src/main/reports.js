@@ -68,7 +68,7 @@ function buildRows(reportType, report) {
                 Цена: o.price ?? '',
                 Площадь: o.totalArea ?? '',
                 Договор: o.contractNumber || '',
-                Сайт: o.presence.site ? '✓' : '×',
+                Сайт: o.listingStatus === 'sold' ? '−' : (o.presence.site ? '✓' : '×'),
                 ILVO: o.presence.ilvo ? '✓' : '×',
                 Kufar: o.presence.kufar ? '✓' : '×',
                 Статус: o.status

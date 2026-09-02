@@ -2,8 +2,13 @@ import { el, formatShortDate, sourceLogo, icon } from '../format.js';
 import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
 
-function chip(present) {
-    return el('span', { class: `presence-chip ${present ? 'ok' : 'no'}` }, present ? '\u2713' : '\u00D7');
+function chip(present, sold = false) {
+    const soldLabel = 'Есть в JSON сайта, но снят с продажи';
+    return el('span', {
+        class: `presence-chip ${sold ? 'warn' : (present ? 'ok' : 'no')}`,
+        title: sold ? soldLabel : undefined,
+        'aria-label': sold ? soldLabel : (present ? 'Объект найден' : 'Объект отсутствует')
+    }, sold ? '\u2212' : (present ? '\u2713' : '\u00D7'));
 }
 
 function listingBadge(object) {
@@ -81,7 +86,7 @@ export function renderComparison(container) {
             columns: [
                 { key: 'objectNumber', label: '№' },
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
-                { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => chip(o.presence.site) },
+                { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => chip(o.presence.site, o.listingStatus === 'sold') },
                 { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => chip(o.presence.ilvo) },
                 { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => chip(o.presence.kufar) },
                 { key: 'listingStatus', label: 'Статус размещения', render: listingBadge }

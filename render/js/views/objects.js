@@ -3,8 +3,13 @@ import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
 import { openModal, closeModal } from '../components/modal.js';
 
-function presenceChip(present, label) {
-    return el('span', { class: `presence-chip ${present ? 'ok' : 'no'}`, title: label }, present ? '\u2713' : '\u00D7');
+function presenceChip(present, label, variant = '') {
+    const sold = variant === 'sold';
+    return el('span', {
+        class: `presence-chip ${sold ? 'warn' : (present ? 'ok' : 'no')}`,
+        title: sold ? 'Есть в JSON сайта, но снят с продажи' : label,
+        'aria-label': sold ? 'Есть в JSON сайта, но снят с продажи' : (present ? 'Объект найден' : 'Объект отсутствует')
+    }, sold ? '\u2212' : (present ? '\u2713' : '\u00D7'));
 }
 
 function statusBadge(status, listingStatus, listingStatusDate) {
@@ -421,7 +426,11 @@ export function renderObjects(container) {
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
                 { key: 'price', label: 'Цена', render: formatObjectPrice },
                 { key: 'contractNumber', label: 'Договор', render: (o) => o.contractNumber || '—' },
-                { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => presenceChip(o.presence.site) },
+                { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => presenceChip(
+                    o.presence.site,
+                    o.listingStatus === 'sold' ? 'Есть в JSON сайта, но снят с продажи' : undefined,
+                    o.listingStatus === 'sold' ? 'sold' : ''
+                ) },
                 { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => presenceChip(o.presence.ilvo) },
                 { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => presenceChip(o.presence.kufar) },
                 { key: 'status', label: 'Статус', render: (o) => statusBadge(o.status, o.listingStatus, o.listingStatusDate) }
