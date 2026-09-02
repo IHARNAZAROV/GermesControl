@@ -1,2 +1,3 @@
 - [Hermes Control: cross-source matching](hermes-control-matching.md) — real estate listings from different systems rarely share IDs or address formatting; how this project matches & compares them without false-positive noise.
 - [Electron runtime compatibility](electron-runtime-compatibility.md) — imported Electron 44 warns under the project’s Node 20 environment; avoid treating it as an app logic failure.
+- [Native Excel charts](xlsx-chart-compatibility.md) — keep chart objects in XLSX by merging OOXML; the legacy generator’s column/bar multi-chart path is reliable, pie is not.

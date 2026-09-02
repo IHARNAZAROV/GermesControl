@@ -1,7 +1,10 @@
 'use strict';
 
+const fs = require('fs');
 const dayjs = require('dayjs');
 const XLSX = require('xlsx');
+const JSZip = require('jszip');
+const XLSXChart = require('xlsx-chart');
 
 const REPORT_LABELS = {
     missing: 'Отчёт по отсутствующим объектам',
@@ -509,7 +512,7 @@ function createDataSheet(title, rows, columns) {
     return ws;
 }
 
-function createSummarySheet(reportType, report, rows) {
+function createSummarySheet(reportType, report, rows, specificRows = reportSpecificSummary(reportType, rows, report)) {
     const stats = report.stats || {};
     const title = REPORT_LABELS[reportType] || 'Отчёт';
     const sourceRows = [
@@ -532,7 +535,6 @@ function createSummarySheet(reportType, report, rows) {
         ['С договором', stats.withContract || 0],
         ['Без договора', stats.withoutContract || 0]
     ];
-    const specificRows = reportSpecificSummary(reportType, rows, report);
     const maxSpecific = Math.max(...specificRows.slice(1).map((row) => Number(row[1]) || 0), 0);
     const specificWithBars = [
         [specificRows[0][0], specificRows[0][1], 'Визуально'],
@@ -578,11 +580,153 @@ function createSummarySheet(reportType, report, rows) {
     return ws;
 }
 
+function chartDefinition(title, entries, chart = 'column') {
+    const safeEntries = entries.length ? entries : [['Нет данных', 0]];
+    return {
+        chart,
+        titles: [title],
+        fields: safeEntries.map(([label]) => String(label)),
+        data: {
+            [title]: Object.fromEntries(safeEntries.map(([label, value]) => [String(label), Number(value) || 0]))
+        },
+        chartTitle: title
+    };
+}
+
+function buildChartDefinitions(reportType, report, rows) {
+    const stats = report.stats || {};
+    const specificRows = reportSpecificSummary(reportType, rows, report);
+    return [
+        {
+            definition: chartDefinition('Количество записей по источникам', [
+                ['Сайт', stats.siteCount || 0],
+                ['ILVO', stats.ilvoCount || 0],
+                ['Kufar', stats.kufarCount || 0]
+            ]),
+            formulas: [
+                "'Сводка'!$B$19",
+                "'Сводка'!$A$20:$A$22",
+                "'Сводка'!$B$20:$B$22"
+            ],
+            colors: ['155945', 'D97706', '6A7FDB']
+        },
+        {
+            definition: chartDefinition(
+                REPORT_LABELS[reportType] || 'Показатели отчёта',
+                specificRows.slice(1),
+                'bar'
+            ),
+            formulas: [
+                "'Сводка'!$B$25",
+                `'Сводка'!$A$26:$A$${25 + specificRows.length - 1}`,
+                `'Сводка'!$B$26:$B$${25 + specificRows.length - 1}`
+            ],
+            colors: ['287A61', 'D97706', '6A7FDB', 'DC2626', '8B1E3F', '155945']
+        }
+    ];
+}
+
+function replaceChartReferences(xml, formulas) {
+    let formulaIndex = 0;
+    return xml.replace(/<c:f>[^<]*<\/c:f>/g, (formula) => {
+        const nextFormula = formulas[formulaIndex++];
+        return nextFormula ? `<c:f>${nextFormula}</c:f>` : formula;
+    });
+}
+
+function addChartPointColors(xml, colors) {
+    const points = colors.map((color, index) => (
+        `<c:dPt><c:idx val="${index}"/><c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr></c:dPt>`
+    )).join('');
+    return xml.replace('<c:cat>', `${points}<c:cat>`);
+}
+
+function positionCharts(xml) {
+    let index = 0;
+    return xml.replace(/<xdr:twoCellAnchor>[\s\S]*?<\/xdr:twoCellAnchor>/g, (anchor) => {
+        const fromRow = 3 + index * 16;
+        const toRow = 18 + index * 16;
+        index += 1;
+        return anchor
+            .replace(/(<xdr:from>[\s\S]*?<xdr:col>)[^<]+/, '$14')
+            .replace(/(<xdr:from>[\s\S]*?<xdr:row>)[^<]+/, `$1${fromRow}`)
+            .replace(/(<xdr:to>[\s\S]*?<xdr:col>)[^<]+/, '$115')
+            .replace(/(<xdr:to>[\s\S]*?<xdr:row>)[^<]+/, `$1${toRow}`);
+    });
+}
+
+function addChartRelationship(sheetRelationships) {
+    const relationship = '<Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>';
+    if (!sheetRelationships) {
+        return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationship}</Relationships>`;
+    }
+    if (sheetRelationships.includes('drawing1.xml')) return sheetRelationships;
+    return sheetRelationships.replace('</Relationships>', `${relationship}</Relationships>`);
+}
+
+function addDrawingToSheet(sheetXml) {
+    let xml = sheetXml;
+    if (!xml.includes('xmlns:r=')) {
+        xml = xml.replace('<worksheet ', '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+    }
+    if (!xml.includes('<drawing ')) {
+        xml = xml.replace('</worksheet>', '<drawing r:id="rIdChart"/></worksheet>');
+    }
+    return xml;
+}
+
+function addChartContentTypes(contentTypesXml, chartCount) {
+    const overrides = Array.from({ length: chartCount }, (_, index) => (
+        `<Override PartName="/xl/charts/chart${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`
+    )).join('');
+    if (contentTypesXml.includes('/xl/charts/chart1.xml')) return contentTypesXml;
+    return contentTypesXml.replace('</Types>', `${overrides}</Types>`);
+}
+
+function generateChartPackage(chartDefinitions) {
+    return new Promise((resolve, reject) => {
+        const xlsxChart = new XLSXChart();
+        xlsxChart.generate({ charts: chartDefinitions.map((chart) => chart.definition), type: 'nodebuffer' }, (error, buffer) => {
+            if (error) reject(error);
+            else resolve(buffer);
+        });
+    });
+}
+
+async function addChartsToWorkbook(workbookBuffer, chartDefinitions) {
+    const chartBuffer = await generateChartPackage(chartDefinitions);
+    const workbookZip = new JSZip();
+    const chartZip = new JSZip();
+    workbookZip.load(workbookBuffer);
+    chartZip.load(chartBuffer);
+
+    chartDefinitions.forEach((chart, index) => {
+        const chartXml = chartZip.file(`xl/charts/chart${index + 1}.xml`).asText();
+        workbookZip.file(
+            `xl/charts/chart${index + 1}.xml`,
+            addChartPointColors(replaceChartReferences(chartXml, chart.formulas), chart.colors)
+        );
+    });
+    workbookZip.file('xl/drawings/drawing1.xml', positionCharts(chartZip.file('xl/drawings/drawing1.xml').asText()));
+    workbookZip.file('xl/drawings/_rels/drawing1.xml.rels', chartZip.file('xl/drawings/_rels/drawing1.xml.rels').asText());
+    workbookZip.file(
+        'xl/worksheets/_rels/sheet1.xml.rels',
+        addChartRelationship(workbookZip.file('xl/worksheets/_rels/sheet1.xml.rels')?.asText())
+    );
+    workbookZip.file('xl/worksheets/sheet1.xml', addDrawingToSheet(workbookZip.file('xl/worksheets/sheet1.xml').asText()));
+    workbookZip.file(
+        '[Content_Types].xml',
+        addChartContentTypes(workbookZip.file('[Content_Types].xml').asText(), chartDefinitions.length)
+    );
+    return workbookZip.generate({ type: 'nodebuffer' });
+}
+
 function buildWorkbook(reportType, report) {
     const rows = buildRows(reportType, report);
     const columns = REPORT_COLUMNS[reportType] || REPORT_COLUMNS.full;
+    const specificRows = reportSpecificSummary(reportType, rows, report);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, createSummarySheet(reportType, report, rows), 'Сводка');
+    XLSX.utils.book_append_sheet(workbook, createSummarySheet(reportType, report, rows, specificRows), 'Сводка');
     XLSX.utils.book_append_sheet(workbook, createDataSheet(REPORT_LABELS[reportType] || 'Данные', rows, columns), 'Данные');
     workbook.Props = {
         Title: REPORT_LABELS[reportType] || 'Отчёт',
@@ -598,7 +742,10 @@ async function generateReport({ reportType, format, report, destPath }) {
         throw new Error('Доступен только экспорт в XLSX.');
     }
     const { workbook, rows } = buildWorkbook(reportType, report);
-    XLSX.writeFile(workbook, destPath, { cellStyles: true });
+    const chartDefinitions = buildChartDefinitions(reportType, report, rows);
+    const workbookBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', cellStyles: true });
+    const finalBuffer = await addChartsToWorkbook(workbookBuffer, chartDefinitions);
+    await fs.promises.writeFile(destPath, finalBuffer);
     return { rows: rows.length, destPath };
 }
 

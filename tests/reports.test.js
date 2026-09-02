@@ -6,6 +6,7 @@ const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const XLSX = require('xlsx');
+const JSZip = require('jszip');
 
 const { buildSampleDataset } = require('../src/main/sampleData');
 const { runComparison } = require('../src/main/compare');
@@ -63,4 +64,31 @@ test('rejects every export format except xlsx', async () => {
         /только экспорт.*XLSX/iu
     );
     fs.rmSync(path.dirname(destination), { recursive: true, force: true });
+});
+
+test('embeds two native colored Excel charts linked to the summary', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'germes-charts-'));
+    const destination = path.join(directory, 'report.xlsx');
+    await generateReport({
+        reportType: 'full',
+        format: 'xlsx',
+        report: demoReport(),
+        destPath: destination
+    });
+
+    const zip = new JSZip();
+    zip.load(fs.readFileSync(destination));
+    const chartOne = zip.file('xl/charts/chart1.xml').asText();
+    const chartTwo = zip.file('xl/charts/chart2.xml').asText();
+    const drawing = zip.file('xl/drawings/drawing1.xml').asText();
+    const sheet = zip.file('xl/worksheets/sheet1.xml').asText();
+
+    assert.match(chartOne, /'Сводка'!\$A\$20:\$A\$22/u);
+    assert.match(chartOne, /srgbClr val="155945"/u);
+    assert.match(chartTwo, /'Сводка'!\$A\$26:\$A\$30/u);
+    assert.match(chartTwo, /srgbClr val="D97706"/u);
+    assert.match(drawing, /<xdr:col>4<\/xdr:col>/u);
+    assert.match(sheet, /<drawing r:id="rIdChart"\/>/u);
+
+    fs.rmSync(directory, { recursive: true, force: true });
 });
