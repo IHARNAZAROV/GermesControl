@@ -9,8 +9,6 @@ const REPORT_TYPES = [
     { key: 'diffs', title: 'Отчёт по расхождениям данных', desc: 'Поля, значения которых отличаются между источниками' },
     { key: 'full', title: 'Полный отчёт', desc: 'Все объекты со статусом по каждому источнику' }
 ];
-const FORMATS = ['xlsx', 'csv', 'pdf', 'json'];
-
 export function renderReports(container) {
     container.innerHTML = '';
     container.appendChild(el('div', { class: 'page-title' }, 'Отчёты'));
@@ -25,19 +23,19 @@ export function renderReports(container) {
         el('div', { class: 'card report-card' }, [
             el('div', { class: 'r-title' }, rt.title),
             el('div', { class: 'r-desc' }, rt.desc),
-            el('div', { class: 'format-row' }, FORMATS.map((fmt) =>
+            el('div', { class: 'format-row' }, [
                 el('button', {
                     class: 'btn btn-secondary btn-sm',
                     onclick: async () => {
                         try {
-                            const res = await window.electronAPI.generateReport(rt.key, fmt);
+                            const res = await window.electronAPI.generateReport(rt.key, 'xlsx');
                             if (!res.canceled) showToast(`Отчёт сохранён: ${res.destPath}`, 'success');
                         } catch (err) {
                             showToast(err.message || 'Не удалось сформировать отчёт', 'error');
                         }
                     }
-                }, fmt.toUpperCase())
-            ))
+                }, 'СКАЧАТЬ XLSX')
+            ])
         ])
     )));
 }

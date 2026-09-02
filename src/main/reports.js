@@ -1,10 +1,7 @@
 'use strict';
 
-const fs = require('fs-extra');
-const path = require('path');
 const dayjs = require('dayjs');
 const XLSX = require('xlsx');
-const PDFDocument = require('pdfkit');
 
 const REPORT_LABELS = {
     missing: 'Отчёт по отсутствующим объектам',
@@ -14,137 +11,601 @@ const REPORT_LABELS = {
     full: 'Полный отчёт'
 };
 
+const SOURCE_LABELS = {
+    site: 'Сайт',
+    ilvo: 'ILVO',
+    kufar: 'Kufar'
+};
+
+const SOURCE_KEYS = Object.keys(SOURCE_LABELS);
+
+const STATUS_LABELS = {
+    active: 'Активен',
+    inactive: 'Неактивен в ILVO',
+    sold: 'Снят с продажи',
+    ok: 'ОК',
+    missing: 'Неполное покрытие',
+    mismatch: 'Расхождение',
+    open: 'Открыта',
+    fixed: 'Исправлена'
+};
+
+const SEVERITY_LABELS = {
+    critical: 'Критическая',
+    warning: 'Предупреждение',
+    info: 'Информационная'
+};
+
+const MATCHING_LABELS = {
+    contract: 'По номеру договора',
+    address_price: 'По адресу и цене',
+    address: 'По адресу',
+    descriptor: 'По цене и параметрам',
+    none: 'Без совпадения'
+};
+
+const OBJECT_REPORT_COLUMNS = [
+    '№ объекта', 'ID группы', 'Объект', 'Тип', 'Тип сделки', 'Город', 'Адрес',
+    'Цена, BYN', 'Цена, USD', 'Общая площадь, м²', 'Жилая площадь, м²',
+    'Площадь кухни, м²', 'Комнат', 'Этаж', 'Этажность', 'Номер договора',
+    'Статус размещения', 'Дата снятия / деактивации', 'Есть на сайте',
+    'Есть в ILVO', 'Есть в Kufar', 'Источники', 'Метод сопоставления',
+    'Уверенность сопоставления', 'Статус данных', 'Количество расхождений',
+    'Количество ошибок'
+];
+
+const REPORT_COLUMNS = {
+    missing: [
+        ...OBJECT_REPORT_COLUMNS,
+        'Отсутствует в источниках', 'Причина включения'
+    ],
+    contracts: [
+        'Номер договора', 'Дата договора', '№ объекта', 'Объект', 'Город',
+        'Адрес', 'Тип', 'Тип сделки', 'Цена, BYN', 'Статус размещения',
+        'Форма на сайте', 'Форма в ILVO', 'Форма в Kufar',
+        'Статус договора', 'Проблема'
+    ],
+    errors: [
+        'ID ошибки', 'Тип', 'Важность', 'Статус', '№ объекта', 'Объект',
+        'Город', 'Адрес', 'Номер договора', 'Объект / договор', 'Источник',
+        'Дата проверки', 'Описание', 'Значение — Сайт', 'Значение — ILVO',
+        'Значение — Kufar', 'Что проверить'
+    ],
+    diffs: [
+        '№ объекта', 'Объект', 'Город', 'Адрес', 'Номер договора', 'Поле',
+        'Единица', 'Значение — Сайт', 'Значение — ILVO', 'Значение — Kufar',
+        'Эталон для цены', 'Статус проверки'
+    ],
+    full: OBJECT_REPORT_COLUMNS
+};
+
+const COLUMN_WIDTHS = {
+    '№ объекта': 12,
+    'ID группы': 18,
+    Объект: 34,
+    Тип: 18,
+    'Тип сделки': 16,
+    Город: 16,
+    Адрес: 34,
+    'Цена, BYN': 15,
+    'Цена, USD': 15,
+    'Общая площадь, м²': 19,
+    'Жилая площадь, м²': 19,
+    'Площадь кухни, м²': 19,
+    'Комнат': 10,
+    'Этаж': 10,
+    'Этажность': 12,
+    'Номер договора': 18,
+    'Дата договора': 16,
+    'Статус размещения': 20,
+    'Дата снятия / деактивации': 24,
+    'Есть на сайте': 16,
+    'Есть в ILVO': 16,
+    'Есть в Kufar': 16,
+    'Источники': 28,
+    'Метод сопоставления': 24,
+    'Уверенность сопоставления': 22,
+    'Статус данных': 20,
+    'Количество расхождений': 22,
+    'Количество ошибок': 18,
+    'Описание': 55,
+    'Значение — Сайт': 28,
+    'Значение — ILVO': 28,
+    'Значение — Kufar': 28,
+    'Что проверить': 55
+};
+
+const STYLES = {
+    title: {
+        font: { bold: true, color: 'FFFFFF', sz: 16 },
+        fill: { fgColor: { rgb: '155945' } },
+        alignment: { vertical: 'center' }
+    },
+    subtitle: {
+        font: { italic: true, color: '52645D', sz: 10 },
+        alignment: { wrapText: true, vertical: 'center' }
+    },
+    header: {
+        font: { bold: true, color: 'FFFFFF' },
+        fill: { fgColor: { rgb: '287A61' } },
+        alignment: { wrapText: true, vertical: 'center', horizontal: 'center' },
+        border: {
+            top: { style: 'thin', color: { rgb: '155945' } },
+            bottom: { style: 'thin', color: { rgb: '155945' } }
+        }
+    },
+    section: {
+        font: { bold: true, color: '155945', sz: 12 },
+        fill: { fgColor: { rgb: 'E6F0EB' } }
+    },
+    label: {
+        font: { bold: true, color: '34463F' },
+        fill: { fgColor: { rgb: 'F2F6F3' } }
+    },
+    warning: {
+        fill: { fgColor: { rgb: 'FFF4D6' } }
+    },
+    danger: {
+        fill: { fgColor: { rgb: 'FDE5E5' } }
+    }
+};
+
+function valueOrDash(value) {
+    return value === null || value === undefined || value === '' ? '—' : value;
+}
+
+function formatDate(value) {
+    if (!value) return '—';
+    const parsed = dayjs(value);
+    return parsed.isValid() ? parsed.format('DD.MM.YYYY') : String(value);
+}
+
+function formatDateTime(value) {
+    if (!value) return '—';
+    const parsed = dayjs(value);
+    return parsed.isValid() ? parsed.format('DD.MM.YYYY HH:mm') : String(value);
+}
+
+function formatNumber(value, digits = 1) {
+    if (value === null || value === undefined || value === '') return '—';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return String(value);
+    return number.toLocaleString('ru-RU', { maximumFractionDigits: digits });
+}
+
+function formatMoney(value, currency) {
+    if (value === null || value === undefined || value === '') return '—';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return String(value);
+    return `${number.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ${currency}`;
+}
+
+function presenceLabel(value) {
+    return value ? 'Есть' : 'Нет';
+}
+
+function listingStatusLabel(value) {
+    return STATUS_LABELS[value] || valueOrDash(value);
+}
+
+function objectStatusLabel(value) {
+    return STATUS_LABELS[value] || valueOrDash(value);
+}
+
+function errorSeverityLabel(value) {
+    return SEVERITY_LABELS[value] || valueOrDash(value);
+}
+
+function matchingLabel(value) {
+    return MATCHING_LABELS[value] || valueOrDash(value);
+}
+
+function confidenceLabel(value) {
+    return {
+        strong: 'Высокая',
+        review: 'Требует проверки',
+        none: 'Нет совпадения'
+    }[value] || valueOrDash(value);
+}
+
+function objectSourceSummary(object) {
+    return SOURCE_KEYS
+        .filter((source) => object?.presence?.[source])
+        .map((source) => SOURCE_LABELS[source])
+        .join(', ') || 'Нет источников';
+}
+
+function missingSourceSummary(object) {
+    return SOURCE_KEYS
+        .filter((source) => !object?.presence?.[source])
+        .map((source) => SOURCE_LABELS[source])
+        .join(', ') || '—';
+}
+
+function statusForObject(object) {
+    return objectStatusLabel(object?.status);
+}
+
+function findErrorObject(error, objectsByNumber) {
+    if (!error || error.targetType === 'contract') return null;
+    return objectsByNumber.get(String(error.target)) || null;
+}
+
+function findErrorContract(error, contractsByNumber) {
+    if (!error || error.targetType !== 'contract') return null;
+    return contractsByNumber.get(String(error.target)) || null;
+}
+
+function contractIssue(contract, object, contractsByNumber) {
+    if (!contract || contract.duplicate) return contract?.duplicate ? 'Дубликат номера' : null;
+    if (!object) return 'Договор без объекта';
+    const related = contractsByNumber.get(String(contract.number));
+    if (related?.duplicate) return 'Дубликат номера';
+    return null;
+}
+
+function errorAction(error) {
+    if (!error) return 'Проверьте исходные данные и повторите проверку.';
+    if (['Разная цена', 'Разная площадь', 'Разный адрес', 'Разное количество комнат'].includes(error.type)) {
+        return 'Сверьте значения источников и исправьте запись с неверным значением.';
+    }
+    if (error.type === 'Разные разделители номера договора') {
+        return 'Приведите номер договора к единому формату в исходном файле.';
+    }
+    if (error.type === 'Нет договора') {
+        return 'Добавьте номер договора хотя бы в один источник.';
+    }
+    if (error.type === 'Дубликат договора' || error.type === 'Договор без объекта') {
+        return 'Проверьте номер договора и его привязку к объекту.';
+    }
+    if (error.type?.startsWith('Объект отсутствует')) {
+        return 'Проверьте, нужно ли добавить объект в указанный источник.';
+    }
+    return 'Проверьте исходные данные и повторите проверку.';
+}
+
+function objectColumns(object, errorCounts) {
+    return {
+        '№ объекта': valueOrDash(object.objectNumber),
+        'ID группы': valueOrDash(object.id),
+        Объект: valueOrDash(object.title),
+        Тип: valueOrDash(object.type),
+        'Тип сделки': valueOrDash(object.dealType),
+        Город: valueOrDash(object.city),
+        Адрес: valueOrDash(object.address),
+        'Цена, BYN': object.price ?? '—',
+        'Цена, USD': object.priceUsd ?? '—',
+        'Общая площадь, м²': object.totalArea ?? '—',
+        'Жилая площадь, м²': object.livingArea ?? '—',
+        'Площадь кухни, м²': object.kitchenArea ?? '—',
+        Комнат: object.rooms ?? '—',
+        Этаж: object.floor ?? '—',
+        Этажность: object.floors ?? '—',
+        'Номер договора': valueOrDash(object.contractNumber),
+        'Статус размещения': listingStatusLabel(object.listingStatus),
+        'Дата снятия / деактивации': formatDate(object.listingStatusDate),
+        'Есть на сайте': presenceLabel(object.presence?.site),
+        'Есть в ILVO': presenceLabel(object.presence?.ilvo),
+        'Есть в Kufar': presenceLabel(object.presence?.kufar),
+        Источники: objectSourceSummary(object),
+        'Метод сопоставления': matchingLabel(object.matchedBy),
+        'Уверенность сопоставления': confidenceLabel(object.matchConfidence),
+        'Статус данных': statusForObject(object),
+        'Количество расхождений': object.fieldDiffs?.length || 0,
+        'Количество ошибок': errorCounts.get(String(object.objectNumber)) || 0
+    };
+}
+
 function buildRows(reportType, report) {
-    const { objects, errors, contracts } = report;
-    const errorTarget = (error) => error.targetType === 'contract'
-        ? `Договор ${error.target || ''}`
-        : `№${error.target || ''}`;
+    const objects = report?.objects || [];
+    const errors = report?.errors || [];
+    const contracts = report?.contracts || [];
+    const objectsByNumber = new Map(objects.map((object) => [String(object.objectNumber), object]));
+    const objectsById = new Map(objects.map((object) => [String(object.id), object]));
+    const contractsByNumber = new Map(contracts.map((contract) => [String(contract.number ?? contract.key), contract]));
+    const errorCounts = new Map();
+    errors.forEach((error) => {
+        if (error.targetType !== 'contract') {
+            const key = String(error.target);
+            errorCounts.set(key, (errorCounts.get(key) || 0) + 1);
+        }
+    });
+
     switch (reportType) {
         case 'missing':
             return objects
-                .filter((o) => o.status === 'missing')
-                .map((o) => ({
-                    '№': o.objectNumber,
-                    Объект: o.title || '',
-                    Сайт: o.presence.site ? 'есть' : 'нет',
-                    ILVO: o.presence.ilvo ? 'есть' : 'нет',
-                    Kufar: o.presence.kufar ? 'есть' : 'нет'
+                .filter((object) => object.status === 'missing')
+                .map((object) => ({
+                    ...objectColumns(object, errorCounts),
+                    'Отсутствует в источниках': missingSourceSummary(object),
+                    'Причина включения': object.listingStatus === 'sold'
+                        ? 'Снят с продажи'
+                        : 'Карточка есть не во всех источниках'
                 }));
+
         case 'contracts':
-            return contracts.map((c) => ({
-                'Номер договора': c.number || '',
-                Дата: c.date || '',
-                '№ объекта': objects.find((o) => o.id === c.objectId)?.objectNumber || '—'
-            }));
+            return contracts.map((contract) => {
+                const object = contract.objectId ? objectsById.get(String(contract.objectId)) : null;
+                const issue = contractIssue(contract, object, contractsByNumber);
+                return {
+                    'Номер договора': valueOrDash(contract.number || contract.key),
+                    'Дата договора': formatDate(contract.date),
+                    '№ объекта': object ? valueOrDash(object.objectNumber) : '—',
+                    Объект: object ? valueOrDash(object.title) : 'Не привязан',
+                    Город: object ? valueOrDash(object.city) : '—',
+                    Адрес: object ? valueOrDash(object.address) : '—',
+                    Тип: object ? valueOrDash(object.type) : '—',
+                    'Тип сделки': object ? valueOrDash(object.dealType) : '—',
+                    'Цена, BYN': object?.price ?? '—',
+                    'Статус размещения': object ? listingStatusLabel(object.listingStatus) : '—',
+                    'Форма на сайте': valueOrDash(object?.contractForms?.site),
+                    'Форма в ILVO': valueOrDash(object?.contractForms?.ilvo),
+                    'Форма в Kufar': valueOrDash(object?.contractForms?.kufar),
+                    'Статус договора': issue || 'ОК',
+                    Проблема: issue || '—'
+                };
+            });
+
         case 'errors':
-            return errors.map((e) => ({
-                Тип: e.type,
-                Описание: e.description,
-                'Объект / Договор': errorTarget(e),
-                Источник: e.source,
-                Дата: e.date,
-                Важность: e.severity,
-                Статус: e.status
-            }));
+            return errors.map((error) => {
+                const object = findErrorObject(error, objectsByNumber);
+                const contract = findErrorContract(error, contractsByNumber);
+                const diff = object?.fieldDiffs?.find((item) => (
+                    error.type.toLocaleLowerCase('ru-RU').includes(String(item.label).toLocaleLowerCase('ru-RU'))
+                    || error.type === 'Другие несоответствия'
+                ));
+                return {
+                    'ID ошибки': valueOrDash(error.id),
+                    Тип: valueOrDash(error.type),
+                    Важность: errorSeverityLabel(error.severity),
+                    Статус: STATUS_LABELS[error.status] || valueOrDash(error.status),
+                    '№ объекта': object ? valueOrDash(object.objectNumber) : '—',
+                    Объект: object ? valueOrDash(object.title) : '—',
+                    Город: object ? valueOrDash(object.city) : '—',
+                    Адрес: object ? valueOrDash(object.address) : '—',
+                    'Номер договора': object
+                        ? valueOrDash(object.contractNumber)
+                        : (contract ? valueOrDash(contract.number) : '—'),
+                    'Объект / договор': error.targetType === 'contract'
+                        ? `Договор ${error.target || '—'}`
+                        : `Объект №${error.target || '—'}`,
+                    Источник: valueOrDash(error.source),
+                    'Дата проверки': formatDate(error.date),
+                    Описание: valueOrDash(error.description),
+                    'Значение — Сайт': valueOrDash(diff?.values?.site),
+                    'Значение — ILVO': valueOrDash(diff?.values?.ilvo),
+                    'Значение — Kufar': valueOrDash(diff?.values?.kufar),
+                    'Что проверить': errorAction(error)
+                };
+            });
+
         case 'diffs':
             return objects
-                .filter((o) => o.fieldDiffs && o.fieldDiffs.length)
-                .flatMap((o) =>
-                    o.fieldDiffs.map((d) => ({
-                        '№': o.objectNumber,
-                        Поле: d.label,
-                        Сайт: d.values.site ?? '',
-                        ILVO: d.values.ilvo ?? '',
-                        Kufar: d.values.kufar ?? ''
-                    }))
-                );
+                .filter((object) => object.fieldDiffs?.length)
+                .flatMap((object) => object.fieldDiffs.map((diff) => ({
+                    '№ объекта': valueOrDash(object.objectNumber),
+                    Объект: valueOrDash(object.title),
+                    Город: valueOrDash(object.city),
+                    Адрес: valueOrDash(object.address),
+                    'Номер договора': valueOrDash(object.contractNumber),
+                    Поле: valueOrDash(diff.label),
+                    Единица: valueOrDash(diff.unit),
+                    'Значение — Сайт': valueOrDash(diff.values?.site),
+                    'Значение — ILVO': valueOrDash(diff.values?.ilvo),
+                    'Значение — Kufar': valueOrDash(diff.values?.kufar),
+                    'Эталон для цены': ['price', 'priceUsd'].includes(diff.field) ? 'ILVO' : '—',
+                    'Статус проверки': 'Требует проверки'
+                })));
+
         case 'full':
         default:
-            return objects.map((o) => ({
-                '№': o.objectNumber,
-                Объект: o.title || '',
-                Тип: o.type || '',
-                Город: o.city || '',
-                Цена: o.price ?? '',
-                Площадь: o.totalArea ?? '',
-                Договор: o.contractNumber || '',
-                Сайт: o.listingStatus === 'sold' ? '−' : (o.presence.site ? '✓' : '×'),
-                ILVO: o.presence.ilvo ? '✓' : '×',
-                Kufar: o.presence.kufar ? '✓' : '×',
-                Статус: o.status
-            }));
+            return objects.map((object) => objectColumns(object, errorCounts));
     }
 }
 
-async function writeXlsx(rows, destPath, sheetName) {
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
-    XLSX.writeFile(wb, destPath);
-}
-
-async function writeCsv(rows, destPath) {
-    if (rows.length === 0) {
-        await fs.writeFile(destPath, '');
-        return;
+function reportSpecificSummary(reportType, rows, report) {
+    const objects = report?.objects || [];
+    const errors = report?.errors || [];
+    const contracts = report?.contracts || [];
+    if (reportType === 'missing') {
+        return [
+            ['Проверяемый показатель', 'Количество'],
+            ['Отсутствуют на сайте', rows.filter((row) => String(row['Отсутствует в источниках']).includes('Сайт')).length],
+            ['Отсутствуют в ILVO', rows.filter((row) => String(row['Отсутствует в источниках']).includes('ILVO')).length],
+            ['Отсутствуют в Kufar', rows.filter((row) => String(row['Отсутствует в источниках']).includes('Kufar')).length]
+        ];
     }
-    const headers = Object.keys(rows[0]);
-    const lines = [headers.join(';')];
-    for (const row of rows) {
-        lines.push(headers.map((h) => String(row[h] ?? '').replace(/;/g, ',')).join(';'));
+    if (reportType === 'contracts') {
+        return [
+            ['Проверяемый показатель', 'Количество'],
+            ['Всего договоров', contracts.length],
+            ['Привязаны к объектам', rows.filter((row) => row['№ объекта'] !== '—').length],
+            ['Без объекта', rows.filter((row) => row['Статус договора'] === 'Договор без объекта').length],
+            ['Дубликаты номеров', rows.filter((row) => row['Статус договора'] === 'Дубликат номера').length]
+        ];
     }
-    await fs.writeFile(destPath, '\uFEFF' + lines.join('\n'), 'utf-8');
+    if (reportType === 'errors') {
+        return [
+            ['Проверяемый показатель', 'Количество'],
+            ['Критические', errors.filter((error) => error.severity === 'critical').length],
+            ['Предупреждения', errors.filter((error) => error.severity === 'warning').length],
+            ['Информационные', errors.filter((error) => error.severity === 'info').length],
+            ['Открытые', errors.filter((error) => error.status === 'open').length]
+        ];
+    }
+    if (reportType === 'diffs') {
+        const byField = new Map();
+        rows.forEach((row) => {
+            const field = String(row.Поле);
+            byField.set(field, (byField.get(field) || 0) + 1);
+        });
+        return [
+            ['Поле с расхождением', 'Количество'],
+            ...[...byField.entries()].sort((a, b) => b[1] - a[1])
+        ];
+    }
+    return [
+        ['Статус объекта', 'Количество'],
+        ['ОК', objects.filter((object) => object.status === 'ok').length],
+        ['Неполное покрытие', objects.filter((object) => object.status === 'missing').length],
+        ['Расхождение', objects.filter((object) => object.status === 'mismatch').length],
+        ['Сняты с продажи', objects.filter((object) => object.listingStatus === 'sold').length],
+        ['Неактивны в ILVO', objects.filter((object) => object.listingStatus === 'inactive').length]
+    ];
 }
 
-async function writeJson(rows, destPath, reportType, report) {
-    await fs.writeJson(destPath, { type: reportType, generatedAt: new Date().toISOString(), checkedAt: report.checkedAt, rows }, { spaces: 2 });
+function bar(value, max) {
+    const size = max > 0 ? Math.round((Number(value) / max) * 18) : 0;
+    return `${'█'.repeat(Math.max(0, size))}${'░'.repeat(Math.max(0, 18 - size))}`;
 }
 
-function writePdf(rows, destPath, title) {
-    return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ margin: 40, size: 'A4' });
-        const stream = fs.createWriteStream(destPath);
-        doc.pipe(stream);
-        doc.fontSize(16).fillColor('#155945').text(title, { align: 'left' });
-        doc.moveDown(0.3);
-        doc.fontSize(9).fillColor('#6B7280').text(`Сформировано: ${dayjs().format('DD.MM.YYYY HH:mm')}`);
-        doc.moveDown(1);
+function setCellStyle(ws, address, style) {
+    if (!ws[address]) ws[address] = { t: 's', v: '' };
+    ws[address].s = style;
+}
 
-        if (rows.length === 0) {
-            doc.fontSize(11).fillColor('#1F2937').text('Нет данных для отображения.');
-        } else {
-            const headers = Object.keys(rows[0]);
-            const colWidth = Math.max(60, Math.floor(500 / headers.length));
-            doc.fontSize(9).fillColor('#0D3F34');
-            let y = doc.y;
-            headers.forEach((h, idx) => doc.text(String(h), 40 + idx * colWidth, y, { width: colWidth }));
-            doc.moveDown(0.5);
-            doc.fontSize(8).fillColor('#1F2937');
-            rows.slice(0, 400).forEach((row) => {
-                y = doc.y;
-                if (y > 760) {
-                    doc.addPage();
-                    y = doc.y;
-                }
-                headers.forEach((h, idx) => doc.text(String(row[h] ?? ''), 40 + idx * colWidth, y, { width: colWidth }));
-                doc.moveDown(0.4);
-            });
+function styleTable(ws, headerRow, columnCount, rows, columns) {
+    for (let column = 0; column < columnCount; column += 1) {
+        setCellStyle(ws, XLSX.utils.encode_cell({ r: headerRow, c: column }), STYLES.header);
+    }
+    for (let row = headerRow + 1; row <= headerRow + rows; row += 1) {
+        for (let column = 0; column < columnCount; column += 1) {
+            const address = XLSX.utils.encode_cell({ r: row, c: column });
+            const value = ws[address]?.v;
+            if (typeof value === 'string' && ['Неполное покрытие', 'Расхождение', 'Критическая', 'Предупреждение'].includes(value)) {
+                setCellStyle(ws, address, value === 'Критическая' || value === 'Расхождение' ? STYLES.danger : STYLES.warning);
+            }
         }
-        doc.end();
-        stream.on('finish', resolve);
-        stream.on('error', reject);
-    });
+    }
+    ws['!cols'] = columns.map((column) => ({
+        wch: COLUMN_WIDTHS[column] || Math.min(42, Math.max(12, String(column).length + 3))
+    }));
+    ws['!autofilter'] = {
+        ref: `A${headerRow + 1}:${XLSX.utils.encode_col(columnCount - 1)}${headerRow + rows + 1}`
+    };
+    ws['!freeze'] = { xSplit: 0, ySplit: headerRow + 1 };
+}
+
+function createDataSheet(title, rows, columns) {
+    const ws = XLSX.utils.aoa_to_sheet([[title], ['Данные последней проверки. Фильтруйте строки по заголовкам столбцов.'], []]);
+    if (columns.length) {
+        XLSX.utils.sheet_add_aoa(ws, [columns], { origin: 'A4' });
+        if (rows.length) {
+            XLSX.utils.sheet_add_json(ws, rows, { origin: 'A5', header: columns, skipHeader: true });
+        }
+        styleTable(ws, 3, columns.length, rows.length, columns);
+    } else {
+        ws['A4'] = { t: 's', v: 'Нет данных для отображения.' };
+        ws['!cols'] = [{ wch: 34 }];
+    }
+    const lastColumn = Math.max(columns.length - 1, 0);
+    ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: lastColumn } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: lastColumn } }
+    ];
+    setCellStyle(ws, 'A1', STYLES.title);
+    setCellStyle(ws, 'A2', STYLES.subtitle);
+    ws['!rows'] = [{ hpt: 26 }, { hpt: 28 }, { hpt: 8 }, { hpt: 32 }];
+    return ws;
+}
+
+function createSummarySheet(reportType, report, rows) {
+    const stats = report.stats || {};
+    const title = REPORT_LABELS[reportType] || 'Отчёт';
+    const sourceRows = [
+        ['Источник', 'Записей загружено', 'Визуально'],
+        ['Сайт', stats.siteCount || 0, bar(stats.siteCount || 0, Math.max(stats.siteCount || 0, stats.ilvoCount || 0, stats.kufarCount || 0))],
+        ['ILVO', stats.ilvoCount || 0, bar(stats.ilvoCount || 0, Math.max(stats.siteCount || 0, stats.ilvoCount || 0, stats.kufarCount || 0))],
+        ['Kufar', stats.kufarCount || 0, bar(stats.kufarCount || 0, Math.max(stats.siteCount || 0, stats.ilvoCount || 0, stats.kufarCount || 0))]
+    ];
+    const metricRows = [
+        ['Показатель', 'Значение'],
+        ['Дата проверки', formatDateTime(report.checkedAt)],
+        ['Уникальных объектов', stats.totalUnique || 0],
+        ['Активных объектов', stats.activeCount || 0],
+        ['Сняты с продажи', stats.soldCount || 0],
+        ['Неактивны в ILVO', stats.inactiveCount || 0],
+        ['Покрытие всех площадок', `${formatNumber(stats.matchPercent, 1)}%`],
+        ['Объекты требуют внимания', stats.problemsCount || 0],
+        ['Всего записей ошибок', stats.errorsCount || 0],
+        ['Критические ошибки', stats.criticalCount || 0],
+        ['С договором', stats.withContract || 0],
+        ['Без договора', stats.withoutContract || 0]
+    ];
+    const specificRows = reportSpecificSummary(reportType, rows, report);
+    const maxSpecific = Math.max(...specificRows.slice(1).map((row) => Number(row[1]) || 0), 0);
+    const specificWithBars = [
+        [specificRows[0][0], specificRows[0][1], 'Визуально'],
+        ...specificRows.slice(1).map((row) => [row[0], row[1], bar(row[1], maxSpecific)])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([
+        [title],
+        ['Сводка сформирована автоматически по результатам последней проверки. В листе «Данные» находится полный реестр выбранного отчёта.'],
+        [],
+        ['Ключевые показатели'],
+        ...metricRows,
+        [],
+        ['Источники данных'],
+        ...sourceRows,
+        [],
+        ['Показатели этого отчёта'],
+        ...specificWithBars
+    ]);
+    const sourceSectionRow = 17;
+    const sourceHeaderRow = 18;
+    const specificSectionRow = sourceHeaderRow + sourceRows.length + 1;
+    const specificHeaderRow = specificSectionRow + 1;
+    const lastRow = specificHeaderRow + specificWithBars.length - 1;
+    ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: 2 } },
+        { s: { r: specificSectionRow, c: 0 }, e: { r: specificSectionRow, c: 2 } }
+    ];
+    setCellStyle(ws, 'A1', STYLES.title);
+    setCellStyle(ws, 'A2', STYLES.subtitle);
+    setCellStyle(ws, 'A4', STYLES.section);
+    setCellStyle(ws, XLSX.utils.encode_cell({ r: sourceSectionRow, c: 0 }), STYLES.section);
+    setCellStyle(ws, XLSX.utils.encode_cell({ r: specificSectionRow, c: 0 }), STYLES.section);
+    for (let column = 0; column < 2; column += 1) setCellStyle(ws, XLSX.utils.encode_cell({ r: 4, c: column }), STYLES.header);
+    for (let column = 0; column < 3; column += 1) setCellStyle(ws, XLSX.utils.encode_cell({ r: sourceHeaderRow, c: column }), STYLES.header);
+    for (let column = 0; column < 3; column += 1) setCellStyle(ws, XLSX.utils.encode_cell({ r: specificHeaderRow, c: column }), STYLES.header);
+    for (let row = 5; row <= 15; row += 1) setCellStyle(ws, `A${row}`, STYLES.label);
+    for (let row = sourceHeaderRow + 1; row < specificSectionRow; row += 1) setCellStyle(ws, `A${row}`, STYLES.label);
+    for (let row = specificHeaderRow + 1; row <= lastRow; row += 1) setCellStyle(ws, `A${row}`, STYLES.label);
+    ws['!cols'] = [{ wch: 34 }, { wch: 24 }, { wch: 24 }];
+    ws['!rows'] = [{ hpt: 28 }, { hpt: 32 }, { hpt: 8 }];
+    return ws;
+}
+
+function buildWorkbook(reportType, report) {
+    const rows = buildRows(reportType, report);
+    const columns = REPORT_COLUMNS[reportType] || REPORT_COLUMNS.full;
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, createSummarySheet(reportType, report, rows), 'Сводка');
+    XLSX.utils.book_append_sheet(workbook, createDataSheet(REPORT_LABELS[reportType] || 'Данные', rows, columns), 'Данные');
+    workbook.Props = {
+        Title: REPORT_LABELS[reportType] || 'Отчёт',
+        Subject: 'Контроль объектов недвижимости и источников данных',
+        Author: 'GermesControl',
+        CreatedDate: new Date()
+    };
+    return { workbook, rows };
 }
 
 async function generateReport({ reportType, format, report, destPath }) {
-    const rows = buildRows(reportType, report);
-    const title = REPORT_LABELS[reportType] || 'Отчёт';
-    if (format === 'xlsx') await writeXlsx(rows, destPath, title);
-    else if (format === 'csv') await writeCsv(rows, destPath);
-    else if (format === 'json') await writeJson(rows, destPath, reportType, report);
-    else if (format === 'pdf') await writePdf(rows, destPath, title);
-    else throw new Error(`Неизвестный формат отчёта: ${format}`);
+    if (format !== 'xlsx') {
+        throw new Error('Доступен только экспорт в XLSX.');
+    }
+    const { workbook, rows } = buildWorkbook(reportType, report);
+    XLSX.writeFile(workbook, destPath, { cellStyles: true });
     return { rows: rows.length, destPath };
 }
 
-module.exports = { generateReport, REPORT_LABELS };
+module.exports = {
+    buildRows,
+    buildWorkbook,
+    generateReport,
+    REPORT_LABELS,
+    REPORT_COLUMNS
+};

@@ -21,7 +21,7 @@ const FILE_FILTERS = {
     kufar: [{ name: 'XML', extensions: ['xml'] }]
 };
 
-const FORMAT_EXT = { xlsx: 'xlsx', csv: 'csv', json: 'json', pdf: 'pdf' };
+const REPORT_FORMAT = 'xlsx';
 const SITE_JSON_URL = 'https://germesgarant.by/data/objects.json';
 const ILVO_EVENTS_URL = 'https://api.ilvo.pro/v1/events';
 const URL_REQUEST_TIMEOUT_MS = 30_000;
@@ -221,15 +221,16 @@ function registerIpcHandlers(getMainWindow) {
         return store.settings.store;
     });
 
-    ipcMain.handle('app:generateReport', async (evt, { reportType, format }) => {
+    ipcMain.handle('app:generateReport', async (evt, { reportType, format = REPORT_FORMAT }) => {
         const report = store.getLastReport();
         if (!report) throw new Error('Сначала запустите проверку данных.');
+        if (format !== REPORT_FORMAT) throw new Error('Доступен только экспорт в XLSX.');
         const win = getMainWindow();
-        const suggested = `${reportType}-${dayjs().format('YYYY-MM-DD')}.${FORMAT_EXT[format]}`;
+        const suggested = `${reportType}-${dayjs().format('YYYY-MM-DD')}.xlsx`;
         const { canceled, filePath } = await dialog.showSaveDialog(win, {
             title: REPORT_LABELS[reportType] || 'Сохранить отчёт',
             defaultPath: suggested,
-            filters: [{ name: format.toUpperCase(), extensions: [FORMAT_EXT[format]] }]
+            filters: [{ name: 'Excel', extensions: ['xlsx'] }]
         });
         if (canceled || !filePath) return { canceled: true };
         const result = await generateReport({ reportType, format, report, destPath: filePath });
