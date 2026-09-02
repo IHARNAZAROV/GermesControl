@@ -228,7 +228,8 @@ test('address comparison normalizes spacing around a corpus number', () => {
         'ул. Фурманова, 60к2',
         'ул. Фурманова, 60 к2',
         'ул. Фурманова, 60 к 2',
-        'ул. Фурманова, 60 корпус 2'
+        'ул. Фурманова, 60 корпус 2',
+        'ул. Фурманова 60-2'
     ];
     const normalized = variants.map((address) => normalizeAddressKey('Лида', address));
     assert.equal(new Set(normalized).size, 1);
@@ -244,7 +245,7 @@ test('address comparison normalizes spacing around a corpus number', () => {
         })],
         kufar: [record('kufar', {
             contractNumber: null,
-            address: variants[3]
+            address: variants[4]
         })],
         contracts: [],
         includeContractRegistry: false

@@ -168,6 +168,9 @@ function cleanLocationText(s) {
         .normalize('NFKC')
         .replace(/(?:корпус|корп)\.?\s*/giu, 'к ')
         .replace(/(\d)\s*к\s*(?=\d)/giu, '$1 к ')
+        // В выгрузке Kufar корпус может приходить как «60-2».
+        // Для адресов это тот же формат, что и «60к2».
+        .replace(/(\d)\s*[-–—]\s*(?=\d)/gu, '$1 к ')
         .replace(/[«»"'.,№]/g, ' ')
         .replace(ADDRESS_STOPWORDS, ' ')
         .replace(/\s+/g, ' ')
