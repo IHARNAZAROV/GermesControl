@@ -9,7 +9,7 @@ const XLSX = require('xlsx');
 
 const { parseIlvoXlsx, parseIlvoApiEvents, parseKufarXml } = require('../src/main/parsers');
 const { runComparison } = require('../src/main/compare');
-const { ERROR_TYPES, normalizeDealType } = require('../src/main/schema');
+const { ERROR_TYPES, normalizeAddressKey, normalizeDealType } = require('../src/main/schema');
 
 function record(source, overrides = {}) {
     return {
@@ -221,6 +221,38 @@ test('address matching treats compact and explicit corpus notation as equal', ()
 
     assert.equal(report.objects.length, 1);
     assert.equal(report.objects[0].matchedBy, 'address_price');
+});
+
+test('address comparison normalizes spacing around a corpus number', () => {
+    const variants = [
+        'ул. Фурманова, 60к2',
+        'ул. Фурманова, 60 к2',
+        'ул. Фурманова, 60 к 2',
+        'ул. Фурманова, 60 корпус 2'
+    ];
+    const normalized = variants.map((address) => normalizeAddressKey('Лида', address));
+    assert.equal(new Set(normalized).size, 1);
+
+    const report = runComparison({
+        site: [record('site', {
+            contractNumber: null,
+            address: variants[0]
+        })],
+        ilvo: [record('ilvo', {
+            contractNumber: null,
+            address: variants[1]
+        })],
+        kufar: [record('kufar', {
+            contractNumber: null,
+            address: variants[3]
+        })],
+        contracts: [],
+        includeContractRegistry: false
+    });
+
+    assert.equal(report.objects.length, 1);
+    assert.equal(report.objects[0].fieldDiffs.some((diff) => diff.field === 'address'), false);
+    assert.equal(report.errors.some((error) => error.type === ERROR_TYPES.ADDRESS_MISMATCH), false);
 });
 
 test('Kufar keeps initials, house number, and corpus in the subject address', async () => {

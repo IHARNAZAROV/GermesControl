@@ -82,6 +82,13 @@ function fieldsDiffer(a, b, field) {
         return normalizeDealType(a) !== normalizeDealType(b);
     }
     if (field.key === 'address') {
+        // Сначала используем тот же канонический ключ, который участвует
+        // в сопоставлении записей. Поэтому варианты корпуса «60к2»,
+        // «60 к2», «60 к 2» и «60 корпус 2» не считаются расхождением.
+        const addressKeyA = normalizeAddressKey(null, a);
+        const addressKeyB = normalizeAddressKey(null, b);
+        if (addressKeyA && addressKeyA === addressKeyB) return false;
+
         const ca = cleanLocationText(a);
         const cb = cleanLocationText(b);
         const ta = tokenSet(ca);
