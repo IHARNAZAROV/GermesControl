@@ -1,12 +1,26 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeImage } = require('electron');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { registerIpcHandlers } = require('./src/main/ipcHandlers');
 
 const WINDOW_DEFAULT_SIZE = { width: 1440, height: 900 };
 const WINDOW_MIN_SIZE = { width: 1100, height: 700 };
+const APP_ICON_PATH = path.join(__dirname, 'render', 'accets', 'icon.ico');
 
 let mainWindow = null;
+
+function loadAppIcon() {
+    const sourceIcon = nativeImage.createFromPath(APP_ICON_PATH);
+    if (sourceIcon.isEmpty()) {
+        throw new Error(`Не удалось загрузить иконку приложения: ${APP_ICON_PATH}`);
+    }
+
+    return sourceIcon.resize({
+        width: 32,
+        height: 32,
+        quality: 'best'
+    });
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -14,7 +28,7 @@ function createWindow() {
         minWidth: WINDOW_MIN_SIZE.width,
         minHeight: WINDOW_MIN_SIZE.height,
         backgroundColor: '#F3F6F3',
-        icon: path.join(__dirname, 'render', 'accets', 'icon.ico'),
+        icon: loadAppIcon(),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
