@@ -14,7 +14,7 @@ function createWindow() {
         minWidth: WINDOW_MIN_SIZE.width,
         minHeight: WINDOW_MIN_SIZE.height,
         backgroundColor: '#F3F6F3',
-        icon: path.join(__dirname, 'render', 'accets', 'germes.png'),
+        icon: path.join(__dirname, 'render', 'accets', 'icon.ico'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
