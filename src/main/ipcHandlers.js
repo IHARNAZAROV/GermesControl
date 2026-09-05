@@ -9,6 +9,7 @@ const {
     parseSiteJsonContent,
     parseIlvoXlsx,
     parseIlvoApiEvents,
+    mergeIlvoApiRecords,
     parseKufarXml
 } = require('./parsers');
 const { runComparison } = require('./compare');
@@ -159,24 +160,48 @@ function registerIpcHandlers(getMainWindow) {
             } catch (error) {
                 throw new Error(`ILVO вернул некорректный JSON: ${error.message}`);
             }
-            const records = parseIlvoApiEvents(rawEvents);
-            if (records.length === 0) {
-                throw new Error('В ответе ILVO не найдено событий с данными объектов.');
+
+            if (!Array.isArray(rawEvents)) {
+                const responseKeys = rawEvents && typeof rawEvents === 'object'
+                    ? Object.keys(rawEvents).slice(0, 10).join(', ')
+                    : typeof rawEvents;
+                throw new Error(`ILVO вернул ответ неожиданного формата вместо массива событий (${responseKeys || 'без полей'}).`);
             }
 
+            if (rawEvents.length === 0) {
+                const currentIlvo = store.getState().sources?.ilvo;
+                return {
+                    sourceKey: 'ilvo',
+                    count: currentIlvo?.data?.length || 0,
+                    eventCount: 0,
+                    fileName: currentIlvo?.meta?.fileName || null,
+                    sourceUrl: ILVO_EVENTS_URL,
+                    noChanges: true
+                };
+            }
+
+            const changedRecords = parseIlvoApiEvents(rawEvents);
+            if (changedRecords.length === 0) {
+                throw new Error(`ILVO вернул ${rawEvents.length} событий, но ни одно не содержит объект с ID. Формат ответа не соответствует документации API.`);
+            }
+
+            const currentRecords = store.getState().sources?.ilvo?.data || [];
+            const records = mergeIlvoApiRecords(currentRecords, changedRecords);
             const storedPath = store.saveRawContent('ilvo', 'events.json', jsonText);
             store.setSourceData('ilvo', records, {
                 fileName: 'events.json (ILVO API)',
                 storedPath,
                 sourceUrl: ILVO_EVENTS_URL,
                 eventCount: Array.isArray(rawEvents) ? rawEvents.length : 0,
+                changedCount: changedRecords.length,
                 syncMode: 'api',
                 isDemo: false
             });
             return {
                 sourceKey: 'ilvo',
                 count: records.length,
-                eventCount: Array.isArray(rawEvents) ? rawEvents.length : 0,
+                eventCount: rawEvents.length,
+                changedCount: changedRecords.length,
                 fileName: 'events.json (ILVO API)',
                 sourceUrl: ILVO_EVENTS_URL
             };

@@ -467,6 +467,32 @@ function parseIlvoApiEvents(rawEvents) {
         });
 }
 
+/**
+ * /v1/events is an incremental event feed, not a complete object export.
+ * Apply the latest states from the feed without discarding objects that did
+ * not receive an event in the current response.
+ */
+function mergeIlvoApiRecords(existingRecords, incomingRecords) {
+    const merged = new Map();
+    const order = [];
+
+    for (const record of Array.isArray(existingRecords) ? existingRecords : []) {
+        if (!record || record.id === undefined || record.id === null) continue;
+        const key = String(record.id);
+        if (!merged.has(key)) order.push(key);
+        merged.set(key, record);
+    }
+
+    for (const record of Array.isArray(incomingRecords) ? incomingRecords : []) {
+        if (!record || record.id === undefined || record.id === null) continue;
+        const key = String(record.id);
+        if (!merged.has(key)) order.push(key);
+        merged.set(key, record);
+    }
+
+    return order.map((key) => merged.get(key));
+}
+
 function unwrapArray(v) {
     if (v === undefined || v === null) return [];
     return Array.isArray(v) ? v : [v];
@@ -601,6 +627,7 @@ module.exports = {
     parseSiteJsonContent,
     parseIlvoXlsx,
     parseIlvoApiEvents,
+    mergeIlvoApiRecords,
     parseKufarXml,
     finalizeRecord
 };

@@ -77,7 +77,11 @@ function sourceCard(key, onChanged) {
                 try {
                     showToast('Синхронизация ILVO по API...');
                     const res = await importIlvoFromApi();
-                    showToast(`ILVO API: загружено ${res.count} объектов из ${res.eventCount} событий`, 'success');
+                    if (res.noChanges) {
+                        showToast(`ILVO API работает: новых событий нет, сохранено ${res.count} объектов`, 'success');
+                    } else {
+                        showToast(`ILVO API: обновлено ${res.changedCount} объектов из ${res.eventCount} событий; всего ${res.count}`, 'success');
+                    }
                     await afterImport(onChanged);
                 } catch (err) {
                     showToast(err.message || 'Не удалось загрузить данные ILVO по API', 'error');

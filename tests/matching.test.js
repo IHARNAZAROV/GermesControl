@@ -7,7 +7,12 @@ const path = require('node:path');
 const test = require('node:test');
 const XLSX = require('xlsx');
 
-const { parseIlvoXlsx, parseIlvoApiEvents, parseKufarXml } = require('../src/main/parsers');
+const {
+    parseIlvoXlsx,
+    parseIlvoApiEvents,
+    mergeIlvoApiRecords,
+    parseKufarXml
+} = require('../src/main/parsers');
 const { runComparison } = require('../src/main/compare');
 const { ERROR_TYPES, normalizeAddressKey, normalizeDealType } = require('../src/main/schema');
 
@@ -112,6 +117,28 @@ test('maps the latest ILVO API delete event to an inactive object', () => {
     assert.equal(record.status, 'inactive');
     assert.equal(record.ilvoApiAction, 'delete');
     assert.equal(record.statusDate, '2026-07-03T09:00:00Z');
+});
+
+test('keeps unchanged ILVO objects when applying an incremental API event batch', () => {
+    const existing = [
+        record('ilvo', { id: '1', price: 100000 }),
+        record('ilvo', { id: '2', price: 200000 })
+    ];
+    const incoming = [
+        record('ilvo', { id: '2', price: 210000, ilvoApiAction: 'update' }),
+        record('ilvo', { id: '3', price: 300000, ilvoApiAction: 'create' })
+    ];
+
+    const merged = mergeIlvoApiRecords(existing, incoming);
+
+    assert.deepEqual(merged.map((item) => item.id), ['1', '2', '3']);
+    assert.equal(merged.find((item) => item.id === '1').price, 100000);
+    assert.equal(merged.find((item) => item.id === '2').price, 210000);
+});
+
+test('an empty ILVO API event batch does not remove existing objects', () => {
+    const existing = [record('ilvo', { id: '1' })];
+    assert.deepEqual(mergeIlvoApiRecords(existing, parseIlvoApiEvents([])), existing);
 });
 
 test('ILVO does not infer deal type from description', async () => {
