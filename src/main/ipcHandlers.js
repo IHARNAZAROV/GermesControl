@@ -8,8 +8,6 @@ const {
     parseSiteJson,
     parseSiteJsonContent,
     parseIlvoXlsx,
-    parseIlvoApiEvents,
-    mergeIlvoApiRecords,
     parseKufarXml
 } = require('./parsers');
 const { runComparison } = require('./compare');
@@ -24,7 +22,6 @@ const FILE_FILTERS = {
 
 const REPORT_FORMAT = 'xlsx';
 const SITE_JSON_URL = 'https://germesgarant.by/data/objects.json';
-const ILVO_EVENTS_URL = 'https://api.ilvo.pro/v1/events';
 const URL_REQUEST_TIMEOUT_MS = 30_000;
 
 function buildFullState() {
@@ -123,91 +120,6 @@ function registerIpcHandlers(getMainWindow) {
         } catch (error) {
             if (error?.name === 'AbortError') {
                 throw new Error('Kufar XML не ответил за 30 секунд. Проверьте ссылку и подключение к интернету.');
-            }
-            throw error;
-        } finally {
-            clearTimeout(timeout);
-        }
-    });
-
-    ipcMain.handle('app:importIlvoFromApi', async () => {
-        const token = String(process.env.ILVO_API_TOKEN || '').trim();
-        if (!token) {
-            throw new Error('Не найден ключ ILVO API. В Replit добавьте ILVO_API_TOKEN в Secrets, а при запуске из VS Code — в локальный файл .env.');
-        }
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), URL_REQUEST_TIMEOUT_MS);
-        try {
-            const response = await fetch(ILVO_EVENTS_URL, {
-                headers: {
-                    Accept: 'application/json',
-                    'x-token': token
-                },
-                signal: controller.signal
-            });
-            if (!response.ok) {
-                if (response.status === 403) {
-                    throw new Error('ILVO отклонил ключ API (HTTP 403). Проверьте ключ в Secrets и настройки доступа в ILVO.');
-                }
-                throw new Error(`ILVO вернул ошибку HTTP ${response.status}.`);
-            }
-
-            const jsonText = await response.text();
-            let rawEvents;
-            try {
-                rawEvents = JSON.parse(jsonText);
-            } catch (error) {
-                throw new Error(`ILVO вернул некорректный JSON: ${error.message}`);
-            }
-
-            if (!Array.isArray(rawEvents)) {
-                const responseKeys = rawEvents && typeof rawEvents === 'object'
-                    ? Object.keys(rawEvents).slice(0, 10).join(', ')
-                    : typeof rawEvents;
-                throw new Error(`ILVO вернул ответ неожиданного формата вместо массива событий (${responseKeys || 'без полей'}).`);
-            }
-
-            if (rawEvents.length === 0) {
-                const currentIlvo = store.getState().sources?.ilvo;
-                return {
-                    sourceKey: 'ilvo',
-                    count: currentIlvo?.data?.length || 0,
-                    eventCount: 0,
-                    fileName: currentIlvo?.meta?.fileName || null,
-                    sourceUrl: ILVO_EVENTS_URL,
-                    noChanges: true
-                };
-            }
-
-            const changedRecords = parseIlvoApiEvents(rawEvents);
-            if (changedRecords.length === 0) {
-                throw new Error(`ILVO вернул ${rawEvents.length} событий, но ни одно не содержит объект с ID. Формат ответа не соответствует документации API.`);
-            }
-
-            const currentRecords = store.getState().sources?.ilvo?.data || [];
-            const records = mergeIlvoApiRecords(currentRecords, changedRecords);
-            const storedPath = store.saveRawContent('ilvo', 'events.json', jsonText);
-            store.setSourceData('ilvo', records, {
-                fileName: 'events.json (ILVO API)',
-                storedPath,
-                sourceUrl: ILVO_EVENTS_URL,
-                eventCount: Array.isArray(rawEvents) ? rawEvents.length : 0,
-                changedCount: changedRecords.length,
-                syncMode: 'api',
-                isDemo: false
-            });
-            return {
-                sourceKey: 'ilvo',
-                count: records.length,
-                eventCount: rawEvents.length,
-                changedCount: changedRecords.length,
-                fileName: 'events.json (ILVO API)',
-                sourceUrl: ILVO_EVENTS_URL
-            };
-        } catch (error) {
-            if (error?.name === 'AbortError') {
-                throw new Error('ILVO не ответил за 30 секунд. Проверьте ссылку и подключение к интернету.');
             }
             throw error;
         } finally {

@@ -96,7 +96,7 @@ export function renderSettings(container) {
                     'Сверка площадок',
                     'Контроль договоров',
                     'Отчёты',
-                    'ILVO API',
+                    'ILVO XLSX',
                     'Kufar XML'
                 ].map((tag) => el('span', { class: 'settings-tag' }, tag)))
             ]),
@@ -178,7 +178,7 @@ export function renderSettings(container) {
         children: [
             el('div', { class: 'settings-sources-list' }, [
                 sourceEndpointRow('site', 'Сайт ГермесГарант', SITE_JSON_URL, 'Автозагрузка JSON по URL'),
-                sourceEndpointRow('ilvo', 'ILVO CRM', 'api.ilvo.pro · events', 'API-ключ хранится в .env / Secrets'),
+                sourceEndpointRow('ilvo', 'ILVO CRM', 'XLSX', 'Ручная загрузка файла'),
                 sourceEndpointRow('kufar', 'Kufar', s.kufarXmlUrl || '—', 'XML-фид через ILVO Posting')
             ]),
             el('div', { class: 'settings-inline-field' }, [

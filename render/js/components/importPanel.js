@@ -1,5 +1,5 @@
 import { el, formatDateTime, sourceLogo } from '../format.js';
-import { store, importSource, importSiteFromUrl, importIlvoFromApi, importKufarFromUrl, runCheck } from '../state.js';
+import { store, importSource, importSiteFromUrl, importKufarFromUrl, runCheck } from '../state.js';
 import { openModal, closeModal } from './modal.js';
 import { showToast } from './toast.js';
 
@@ -75,23 +75,6 @@ function sourceCard(key, onChanged) {
             class: 'btn btn-primary btn-sm',
             onclick: async () => {
                 try {
-                    showToast('Синхронизация ILVO по API...');
-                    const res = await importIlvoFromApi();
-                    if (res.noChanges) {
-                        showToast(`ILVO API работает: новых событий нет, сохранено ${res.count} объектов`, 'success');
-                    } else {
-                        showToast(`ILVO API: обновлено ${res.changedCount} объектов из ${res.eventCount} событий; всего ${res.count}`, 'success');
-                    }
-                    await afterImport(onChanged);
-                } catch (err) {
-                    showToast(err.message || 'Не удалось загрузить данные ILVO по API', 'error');
-                }
-            }
-        }, 'Синхронизировать API'));
-        actions.appendChild(el('button', {
-            class: 'btn btn-secondary btn-sm',
-            onclick: async () => {
-                try {
                     const res = await importSource(key);
                     if (!res.canceled) {
                         showToast(`${meta.label}: загружено ${res.count} объектов`, 'success');
@@ -152,7 +135,7 @@ export function openImportModal() {
         kicker: 'Источники данных',
         width: '720px',
         body: [
-            el('p', { class: 'card-subtitle', style: 'margin-bottom:16px;' }, 'Сайт ГермесГарант и ILVO можно обновить по API, а остальные источники загружаются вручную. После обновления источников запустите проверку, чтобы обновить сводку.'),
+            el('p', { class: 'card-subtitle', style: 'margin-bottom:16px;' }, 'Сайт ГермесГарант обновляется автоматически, ILVO загружается из XLSX, а Kufar — из XML. После обновления источников запустите проверку, чтобы обновить сводку.'),
             grid
         ],
         footer: [el('button', { class: 'btn btn-secondary', onclick: closeModal }, 'Закрыть')]

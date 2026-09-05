@@ -500,9 +500,8 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         const i = group.records.ilvo || null;
         const k = group.records.kufar || null;
         const presence = { site: !!s, ilvo: !!i, kufar: !!k };
-        // Статус sold на сайте определяет снятие объекта с продажи. Для
-        // ILVO API отдельный inactive означает, что запись удалена/неактивна
-        // в CRM, поэтому её не следует считать активным пропуском на площадке.
+        // Статус sold на сайте определяет снятие объекта с продажи. Неактивную
+        // запись ILVO также не следует считать активным пропуском на площадке.
         const soldRecord = isSoldSiteRecord(s) ? s : null;
         const inactiveRecord = !soldRecord && i?.status === 'inactive' ? i : null;
         const lifecycleRecords = [soldRecord, inactiveRecord].filter(Boolean);

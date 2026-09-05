@@ -1,6 +1,5 @@
 const { app, BrowserWindow, nativeImage } = require('electron');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { registerIpcHandlers } = require('./src/main/ipcHandlers');
 
 const WINDOW_DEFAULT_SIZE = { width: 1440, height: 900 };

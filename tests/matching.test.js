@@ -7,12 +7,7 @@ const path = require('node:path');
 const test = require('node:test');
 const XLSX = require('xlsx');
 
-const {
-    parseIlvoXlsx,
-    parseIlvoApiEvents,
-    mergeIlvoApiRecords,
-    parseKufarXml
-} = require('../src/main/parsers');
+const { parseIlvoXlsx, parseKufarXml } = require('../src/main/parsers');
 const { runComparison } = require('../src/main/compare');
 const { ERROR_TYPES, normalizeAddressKey, normalizeDealType } = require('../src/main/schema');
 
@@ -53,92 +48,6 @@ test('normalizes only an explicit deal type and preserves missing data', () => {
     assert.equal(normalizeDealType('Продажа / объект'), 'Продажа');
     assert.equal(normalizeDealType(null), null);
     assert.equal(normalizeDealType(''), null);
-});
-
-test('maps ILVO API events and keeps the latest object state', () => {
-    const object = {
-        id: 42,
-        uuid: '11111111-1111-4111-8111-111111111111',
-        type: 'apartment',
-        category: 'sell',
-        city: 'Лида',
-        street: 'Октябрьская',
-        building: '9',
-        housing: null,
-        rooms: 3,
-        area: 120,
-        area_living: 70,
-        area_kitchen: 15,
-        floor: 1,
-        floors_total: 2,
-        currency: 'BYN',
-        price: '100 000',
-        prices: { BYN: '100 000', USD: '31 000' },
-        description: 'Тестовый объект',
-        contract: { number: '38/1', date: '2026-07-01T10:00:00Z' },
-        created: '2026-07-01T09:00:00Z',
-        modified: '2026-07-02T09:00:00Z'
-    };
-    const records = parseIlvoApiEvents([
-        { data: { action: 'create', data: object }, date: '2026-07-01T09:00:00Z', attempt: 0 },
-        { data: { action: 'update', data: { ...object, price: '101 000', prices: { BYN: '101 000', USD: '31 300' } } }, date: '2026-07-02T09:00:00Z', attempt: 0 }
-    ]);
-
-    assert.equal(records.length, 1);
-    assert.equal(records[0].id, '42');
-    assert.equal(records[0].type, 'Квартира');
-    assert.equal(records[0].dealType, 'Продажа');
-    assert.equal(records[0].price, 101000);
-    assert.equal(records[0].priceUsd, 31300);
-    assert.equal(records[0].status, 'active');
-    assert.equal(records[0].contractNumber, '38/1');
-});
-
-test('maps the latest ILVO API delete event to an inactive object', () => {
-    const base = {
-        id: 7,
-        uuid: '77777777-7777-4777-8777-777777777777',
-        type: 'house',
-        category: 'rent',
-        city: 'Лида',
-        street: 'Мицкевича',
-        building: '1',
-        prices: { BYN: '2 000' },
-        currency: 'BYN',
-        price: '2 000',
-        created: '2026-07-01T09:00:00Z',
-        modified: '2026-07-01T09:00:00Z'
-    };
-    const [record] = parseIlvoApiEvents([
-        { data: { action: 'create', data: base }, date: '2026-07-01T09:00:00Z', attempt: 0 },
-        { data: { action: 'delete', data: base }, date: '2026-07-03T09:00:00Z', attempt: 0 }
-    ]);
-
-    assert.equal(record.status, 'inactive');
-    assert.equal(record.ilvoApiAction, 'delete');
-    assert.equal(record.statusDate, '2026-07-03T09:00:00Z');
-});
-
-test('keeps unchanged ILVO objects when applying an incremental API event batch', () => {
-    const existing = [
-        record('ilvo', { id: '1', price: 100000 }),
-        record('ilvo', { id: '2', price: 200000 })
-    ];
-    const incoming = [
-        record('ilvo', { id: '2', price: 210000, ilvoApiAction: 'update' }),
-        record('ilvo', { id: '3', price: 300000, ilvoApiAction: 'create' })
-    ];
-
-    const merged = mergeIlvoApiRecords(existing, incoming);
-
-    assert.deepEqual(merged.map((item) => item.id), ['1', '2', '3']);
-    assert.equal(merged.find((item) => item.id === '1').price, 100000);
-    assert.equal(merged.find((item) => item.id === '2').price, 210000);
-});
-
-test('an empty ILVO API event batch does not remove existing objects', () => {
-    const existing = [record('ilvo', { id: '1' })];
-    assert.deepEqual(mergeIlvoApiRecords(existing, parseIlvoApiEvents([])), existing);
 });
 
 test('ILVO does not infer deal type from description', async () => {

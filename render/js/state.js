@@ -50,12 +50,6 @@ export async function importSiteFromUrl() {
     return result;
 }
 
-export async function importIlvoFromApi() {
-    const result = await window.electronAPI.importIlvoFromApi();
-    await loadState();
-    return result;
-}
-
 export async function importKufarFromUrl(url) {
     const result = await window.electronAPI.importKufarFromUrl(url);
     await loadState();
