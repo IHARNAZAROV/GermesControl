@@ -3,10 +3,16 @@
 const fs = require('fs-extra');
 const path = require('path');
 const dayjs = require('dayjs');
+const { app } = require('electron');
 const Store = require('electron-store');
 const { buildSampleDataset } = require('./sampleData');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+// The project data directory is writable during development, but files inside
+// app.asar are read-only in a packaged build. Keep user data outside the
+// archive so the first-run seed and all subsequent imports can be persisted.
+const DATA_DIR = app.isPackaged
+    ? path.join(app.getPath('userData'), 'data')
+    : path.join(__dirname, '..', '..', 'data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const REPORT_FILE = path.join(DATA_DIR, 'lastReport.json');

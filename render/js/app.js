@@ -251,4 +251,18 @@ async function bootstrap() {
     document.addEventListener('app:refresh-view', () => rerenderCurrent());
 }
 
-bootstrap();
+function renderBootstrapError(error) {
+    const message = error instanceof Error ? error.message : String(error);
+    viewRoot.innerHTML = '';
+    sidebarEl.innerHTML = '';
+    topbarEl.innerHTML = '';
+    viewRoot.appendChild(el('section', { class: 'empty-state app-error-state' }, [
+        el('div', { class: 'empty-state-icon' }, [icon('alert', 24)]),
+        el('h3', {}, 'Не удалось загрузить данные приложения'),
+        el('p', {}, message),
+        el('p', { class: 'muted' }, 'Перезапустите приложение. Если проблема повторится, проверьте папку данных и права записи.')
+    ]));
+    console.error('GermesControl bootstrap failed:', error);
+}
+
+bootstrap().catch(renderBootstrapError);
