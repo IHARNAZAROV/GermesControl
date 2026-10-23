@@ -4,7 +4,7 @@ import { showToast } from '../components/toast.js';
 
 const APP_VERSION = '1.0.0';
 const APP_AUTHOR = 'INazarov';
-const SITE_JSON_URL = 'https://germesgarant.by/data/objects.json';
+const SITE_JSON_URL = 'https://germesgarant.by/data/objects-source.json';
 
 const APP_DESCRIPTION = [
     'GermesControl — desktop-система контроля качества данных для агентства недвижимости.',

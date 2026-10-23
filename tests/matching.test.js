@@ -7,7 +7,7 @@ const path = require('node:path');
 const test = require('node:test');
 const XLSX = require('xlsx');
 
-const { parseIlvoXlsx, parseKufarXml } = require('../src/main/parsers');
+const { parseSiteJsonContent, parseIlvoXlsx, parseKufarXml } = require('../src/main/parsers');
 const { runComparison } = require('../src/main/compare');
 const { ERROR_TYPES, normalizeAddressKey, normalizeDealType } = require('../src/main/schema');
 
@@ -40,6 +40,69 @@ function comparison(sourceOverrides = {}) {
         includeContractRegistry: false
     });
 }
+
+test('website full archive imports active and sold objects with normalized fields and photos', () => {
+    const records = parseSiteJsonContent(JSON.stringify([
+        {
+            id: 'obj-2',
+            slug: 'active-listing',
+            title: 'Квартира в Лиде',
+            type: 'Квартира',
+            dealType: 'Продажа',
+            city: 'Лида',
+            address: 'ул. Новая, 1',
+            priceBYN: 118300,
+            priceUSD: 38273,
+            rooms: 4,
+            areaTotal: 108.2,
+            areaLiving: 80.4,
+            areaKitchen: 10.5,
+            floor: 2,
+            floorsTotal: 2,
+            cardDescription: 'Актуальное объявление',
+            images: ['/images/objects/active-listing/photo-1.webp']
+        },
+        {
+            id: 'obj-1',
+            slug: 'sold-listing',
+            title: 'Квартира на Тавлая',
+            type: 'Квартира',
+            city: 'Лида',
+            address: 'ул. Тавлая, 35/1',
+            priceBYN: 120000,
+            priceUSD: 41500,
+            areaTotal: 57.7,
+            areaLiving: 30.8,
+            areaKitchen: 8,
+            floorsTotal: 5,
+            contractNumber: 'Договор №1/1 от 01.07.2026',
+            status: { type: 'sold', date: '2026-07-14' },
+            images: ['/images/objects/sold-listing/photo-1.webp']
+        }
+    ]));
+
+    assert.equal(records.length, 2);
+    assert.equal(records[0].id, 'obj-2');
+    assert.equal(records[0].price, 118300);
+    assert.equal(records[0].totalArea, 108.2);
+    assert.equal(records[0].status, 'active');
+    assert.deepEqual(records[0].photos, ['https://germesgarant.by/images/objects/active-listing/photo-1.webp']);
+    assert.equal(records[1].id, 'obj-1');
+    assert.equal(records[1].status, 'sold');
+    assert.equal(records[1].statusDate, '2026-07-14');
+    assert.equal(records[1].contractKey, '1/1');
+    assert.deepEqual(records[1].photos, ['https://germesgarant.by/images/objects/sold-listing/photo-1.webp']);
+
+    const report = runComparison({
+        site: [records[1]],
+        ilvo: [record('ilvo', { contractNumber: '1/1' })],
+        kufar: [],
+        contracts: [],
+        includeContractRegistry: false
+    });
+    assert.equal(report.objects[0].listingStatus, 'sold');
+    assert.equal(report.errors.some((error) => error.target === report.objects[0].objectNumber), false);
+});
 
 test('normalizes only an explicit deal type and preserves missing data', () => {
     assert.equal(normalizeDealType('rent'), 'Аренда');

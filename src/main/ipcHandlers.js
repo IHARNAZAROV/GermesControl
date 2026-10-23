@@ -21,7 +21,7 @@ const FILE_FILTERS = {
 };
 
 const REPORT_FORMAT = 'xlsx';
-const SITE_JSON_URL = 'https://germesgarant.by/data/objects.json';
+const SITE_JSON_URL = 'https://germesgarant.by/data/objects-source.json';
 const URL_REQUEST_TIMEOUT_MS = 30_000;
 
 function buildFullState() {
@@ -87,14 +87,14 @@ function registerIpcHandlers(getMainWindow) {
                 throw new Error('В выгрузке сайта не найдено объектов.');
             }
 
-            const storedPath = store.saveRawContent('site', 'objects.json', jsonText);
+            const storedPath = store.saveRawContent('site', 'objects-source.json', jsonText);
             store.setSourceData('site', records, {
-                fileName: 'objects.json (сайт)',
+                fileName: 'objects-source.json (сайт)',
                 storedPath,
                 sourceUrl: SITE_JSON_URL,
                 isDemo: false
             });
-            return { sourceKey: 'site', count: records.length, fileName: 'objects.json (сайт)', sourceUrl: SITE_JSON_URL };
+            return { sourceKey: 'site', count: records.length, fileName: 'objects-source.json (сайт)', sourceUrl: SITE_JSON_URL };
         } catch (error) {
             if (error?.name === 'AbortError') {
                 throw new Error('Сайт не ответил за 30 секунд. Проверьте подключение к интернету.');

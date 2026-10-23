@@ -12,6 +12,7 @@ const {
 } = require('./schema');
 
 const NUMERIC_KEYS = new Set(OBJECT_FIELDS.filter((f) => f.numeric).map((f) => f.key));
+const SITE_BASE_URL = 'https://germesgarant.by';
 
 function toNumberOrNull(v) {
     if (v === undefined || v === null || v === '') return null;
@@ -33,7 +34,7 @@ function collectPhotoUrls(value, urls = [], photoContext = false) {
     }
     if (typeof value === 'string') {
         const candidate = value.trim();
-        if (photoContext && /^(?:https?:)?\/\//i.test(candidate)) {
+        if (photoContext && (/^(?:https?:)?\/\//i.test(candidate) || candidate.startsWith('/'))) {
             urls.push(candidate.startsWith('//') ? `https:${candidate}` : candidate);
         }
         return urls;
@@ -53,8 +54,9 @@ function collectPhotoUrls(value, urls = [], photoContext = false) {
     return urls;
 }
 
-function extractPhotoUrls(value) {
-    return [...new Set(collectPhotoUrls({ photos: value }))];
+function extractPhotoUrls(value, baseUrl = null) {
+    const urls = [...new Set(collectPhotoUrls({ photos: value }))];
+    return baseUrl ? urls.map((url) => new URL(url, baseUrl).href) : urls;
 }
 
 /**
@@ -84,7 +86,8 @@ function finalizeRecord(rec, source, syntheticId) {
 
 /**
  * Сайт ГермесГарант — выгрузка в формате JSON.
- * Ожидается массив объектов (либо { objects: [...] }) с полями вида
+ * Полный архив приходит массивом в objects-source.json (либо { objects: [...] })
+ * с полями вида
  * priceBYN/priceUSD, areaTotal/areaLiving/areaKitchen, floorsTotal,
  * description/cardDescription, status.type, contractNumber в формате
  * "Договор №N/M от ДД.ММ.ГГГГ".
@@ -118,7 +121,7 @@ function parseSiteJsonData(raw) {
                 ? String(o.status.type || 'active').toLowerCase()
                 : String(o.status || 'active').toLowerCase(),
             statusDate: (o.status && typeof o.status === 'object') ? o.status.date || null : null,
-            photos: extractPhotoUrls(o)
+            photos: extractPhotoUrls(o, SITE_BASE_URL)
             }, 'site', `site-${idx + 1}`);
         })
         .filter((r) => r.title || r.address);
