@@ -561,7 +561,9 @@
 .format-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ---------- Import view ---------- */
-.import-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.import-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.source-bizlida .source-icon { background: #EAF1F9; }
+.source-logo-bizlida { object-fit: contain; }
 .import-card { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .import-card { min-width: 0; }
 .import-card .imp-title { font-weight: 700; font-size: 14px; }

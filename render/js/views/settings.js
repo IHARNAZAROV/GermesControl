@@ -8,7 +8,7 @@ const SITE_JSON_URL = 'https://germesgarant.by/data/objects-source.json';
 
 const APP_DESCRIPTION = [
     'GermesControl — desktop-система контроля качества данных для агентства недвижимости.',
-    'Приложение автоматически сверяет объекты, договоры и рекламные выгрузки между тремя источниками: сайтом компании, ILVO CRM и площадкой Kufar.',
+    'Приложение сверяет объекты и рекламные выгрузки между четырьмя источниками: сайтом компании, ILVO CRM, Kufar и Bizlida. Договоры проверяются только между сайтом, ILVO и Kufar: выгрузка Bizlida их не содержит.',
     'Система находит расхождения в ценах, площадях, адресах и номерах договоров, показывает объекты, отсутствующие на площадках, и формирует наглядные отчёты только в XLSX.'
 ].join(' ');
 
@@ -97,7 +97,8 @@ export function renderSettings(container) {
                     'Контроль договоров',
                     'Отчёты',
                     'ILVO XLSX',
-                    'Kufar XML'
+                    'Kufar XML',
+                    'Bizlida XLSX'
                 ].map((tag) => el('span', { class: 'settings-tag' }, tag)))
             ]),
             el('aside', { class: 'settings-hero-meta' }, [
@@ -179,7 +180,8 @@ export function renderSettings(container) {
             el('div', { class: 'settings-sources-list' }, [
                 sourceEndpointRow('site', 'Сайт ГермесГарант', SITE_JSON_URL, 'Автозагрузка JSON по URL'),
                 sourceEndpointRow('ilvo', 'ILVO CRM', 'XLSX', 'Ручная загрузка файла'),
-                sourceEndpointRow('kufar', 'Kufar', s.kufarXmlUrl || '—', 'XML-фид через ILVO Posting')
+                sourceEndpointRow('kufar', 'Kufar', s.kufarXmlUrl || '—', 'XML-фид через ILVO Posting'),
+                sourceEndpointRow('bizlida', 'Bizlida', 'Ручной импорт XLSX', '7 колонок, цена BYN; без договоров')
             ]),
             el('div', { class: 'settings-inline-field' }, [
                 el('label', { for: 'set-kufar-url' }, 'Ссылка XML-фида Kufar'),

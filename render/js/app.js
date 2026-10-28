@@ -84,7 +84,7 @@ function initials(name) {
 
 let clockInterval = null;
 
-const SOURCE_LABELS = { site: 'Сайт', ilvo: 'ILVO', kufar: 'Kufar' };
+const SOURCE_LABELS = { site: 'Сайт', ilvo: 'ILVO', kufar: 'Kufar', bizlida: 'Bizlida' };
 const SOURCE_KEYS = Object.keys(SOURCE_LABELS);
 const FRESHNESS_LIMIT_MS = 24 * 60 * 60 * 1000;
 

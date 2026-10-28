@@ -84,9 +84,10 @@ test('embeds two native colored Excel charts linked to the summary', async () =>
     const sheet = zip.file('xl/worksheets/sheet1.xml').asText();
     const contentTypes = zip.file('[Content_Types].xml').asText();
 
-    assert.match(chartOne, /'Сводка'!\$A\$20:\$A\$22/u);
+    assert.match(chartOne, /'Сводка'!\$A\$20:\$A\$23/u);
+    assert.match(chartOne, /<c:v>Bizlida<\/c:v>/u);
     assert.match(chartOne, /srgbClr val="155945"/u);
-    assert.match(chartTwo, /'Сводка'!\$A\$26:\$A\$30/u);
+    assert.match(chartTwo, /'Сводка'!\$A\$27:\$A\$31/u);
     assert.match(chartTwo, /srgbClr val="D97706"/u);
     assert.match(drawing, /<xdr:col>4<\/xdr:col>/u);
     assert.match(sheet, /<drawing r:id="rIdChart"\/>/u);

@@ -45,6 +45,7 @@ function matchBasis(obj) {
         address_price: 'Адрес + цена',
         address: 'По адресу',
         descriptor: 'Цена + параметры',
+        title: 'Точный заголовок',
         none: 'Без совпадения'
     };
     const label = labels[obj.matchedBy] || labels.none;
@@ -214,7 +215,8 @@ function renderObjectSources(obj) {
     return el('div', { class: 'object-source-list' }, [
         sourceStatusRow('site', 'Сайт ГермесГарант', obj.presence.site),
         sourceStatusRow('ilvo', 'ILVO CRM', obj.presence.ilvo),
-        sourceStatusRow('kufar', 'Kufar', obj.presence.kufar)
+        sourceStatusRow('kufar', 'Kufar', obj.presence.kufar),
+        sourceStatusRow('bizlida', 'Bizlida', obj.presence.bizlida)
     ]);
 }
 
@@ -235,14 +237,14 @@ function renderObjectDiffs(obj) {
                 el('span', { class: 'object-diff-marker' }),
                 d.label
             ]),
-            el('div', { class: 'field-diff-values' }, ['site', 'ilvo', 'kufar'].map((src) =>
+            el('div', { class: 'field-diff-values' }, ['site', 'ilvo', 'kufar', 'bizlida'].map((src) =>
                 d.values[src] !== undefined ? el('div', {
                     class: `fv ${diffValueState(d.values, src)}`,
                     title: diffValueState(d.values, src) === 'is-different'
                         ? 'Значение отличается от большинства источников'
                         : 'Значение совпадает с большинством источников'
                 }, [
-                    el('span', { class: 'src' }, src === 'site' ? 'Сайт' : src === 'ilvo' ? 'ILVO' : 'Kufar'),
+                    el('span', { class: 'src' }, ({ site: 'Сайт', ilvo: 'ILVO', kufar: 'Kufar', bizlida: 'Bizlida' })[src]),
                     el('strong', {}, [
                         diffValueState(d.values, src) === 'is-different'
                             ? el('span', { class: 'fv-alert-mark', 'aria-hidden': 'true' }, '!')
@@ -334,7 +336,7 @@ function showObjectDetail(obj) {
                         el('span', { class: 'object-aside-icon' }, [icon('database', 17)]),
                         el('div', {}, [
                             el('h3', {}, 'Синхронизация'),
-                            el('span', {}, `${sourceCount} из 3 источников`)
+                            el('span', {}, `${sourceCount} из 4 источников`)
                         ])
                     ]),
                     renderObjectSources(obj)
@@ -433,6 +435,7 @@ export function renderObjects(container) {
                 ) },
                 { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => presenceChip(o.presence.ilvo) },
                 { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => presenceChip(o.presence.kufar) },
+                { key: 'bizlida', label: 'Bizlida', sortValue: (o) => o.presence.bizlida, render: (o) => presenceChip(o.presence.bizlida) },
                 { key: 'status', label: 'Статус', render: (o) => statusBadge(o.status, o.listingStatus, o.listingStatusDate) }
             ],
             rows,

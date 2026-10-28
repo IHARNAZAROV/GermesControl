@@ -483,10 +483,82 @@ async function parseKufarXml(filePathOrContent, isRawContent) {
         .filter((r) => r.title || r.address || r.contractNumber);
 }
 
+// Экспорт Bizlida — семь колонок БЕЗ заголовка. Не используем
+// sheet_to_json с заголовком по умолчанию: иначе теряется первое объявление.
+function extractBizlidaLocation(title, description) {
+    // Рекламная подпись содержит адрес агентства, а не объекта.
+    const safeDescription = String(description || '').split(
+        /(?:лицензия|работаем со всеми|консультаци[а-яё]*\s+по|обращайтесь|наш\s+офис|адрес\s+офиса)/iu
+    )[0];
+    const text = `${title || ''}. ${safeDescription}`;
+    const locality = text.match(
+        /(?:^|[\s,(])(?:д\.|деревн[а-яё]*\s+|аг\.|агрогород[а-яё]*\s+|г\.|городе\s+|(?:городском\s+)?пос[её]л[а-яё]*\s+)\s*([А-ЯЁ][А-Яа-яЁё]*(?:-[А-Яа-яЁё0-9]+)*)/u
+    );
+    // «от г. Лида», «10 мин от ...» — ориентир, а не населённый пункт.
+    let city = locality && !/(?:от|до)\s*$/iu.test(text.slice(Math.max(0, locality.index - 5), locality.index).trim())
+        ? locality[1] : null;
+    if (city === 'Лиде' || city === 'Лиды') city = 'Лида';
+    if (!city) city = String(title || '').match(/(?:^|\s)в\s+(Вороново)(?=$|[\s,.])/u)?.[1] || null;
+    // В этой выгрузке Новосёлки указаны в скобках после улицы.
+    if (!city) city = String(title || '').match(/\((Новос[её]лки)\)/u)?.[1] || null;
+    const street = text.match(
+        /(?:^|[\s,(])(?:ул\.?|улиц[а-яё]*|пр-т\.?|проспект[а-яё]*|пер\.?|переул[а-яё]*|б-р\.?|бульвар[а-яё]*)\s*([А-ЯЁA-Z](?:\.\s*)?[А-Яа-яЁёA-Za-z-]*(?:\s+[А-ЯЁ][А-Яа-яЁё-]*){0,3})(?:\s*,?\s*(?:д\.\s*)?(\d+[а-яa-z]?(?:\/\d+)?)(?:\s*(?:корп(?:ус)?\.?|к|[-–—])\s*(\d+[а-яa-z]?))?)?/u
+    );
+    const garden = text.match(/(?:^|\s)СТ\s+[«"]?([А-ЯЁ][А-Яа-яЁё-]*)/u);
+    const shortStreet = String(title || '').match(/квартир[а-яё]*\s+на\s+([А-ЯЁ][А-Яа-яЁё-]*ского)(?=$|[\s,.])/u);
+    return {
+        city,
+        address: street
+            ? [street[1].trim(), street[2], street[3] ? `корпус ${street[3]}` : null].filter(Boolean).join(', ')
+            : garden ? `СТ ${garden[1]}` : shortStreet ? shortStreet[1] : null
+    };
+}
+
+async function parseBizlidaXlsx(filePath) {
+    const wb = XLSX.readFile(filePath);
+    const records = [];
+    for (const name of wb.SheetNames) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null });
+        for (const row of rows) {
+            if (row.every((value) => value === null || String(value).trim() === '')) continue;
+            // Разрешаем явную строку заголовков, но не пропускаем повреждённые данные.
+            if (/^(?:ссылка|url|ссылка на объявление)$/iu.test(String(row[2] || '').trim())) continue;
+            if (!/^https?:\/\/(?:www\.)?bizlida\.by\/baraholka\/\d+\/?(?:[?#].*)?$/iu.test(String(row[2] || '').trim()) || !row[3]) {
+                throw new Error(`Bizlida: неверный формат строки ${rows.indexOf(row) + 1} листа «${name}». Ожидаются 7 колонок: фото, агентство, ссылка, заголовок, описание, цена, дата.`);
+            }
+            const title = cleanString(row[3]);
+            const description = cleanString(row[4]);
+            const text = `${title} ${description || ''}`;
+            const type = /участок\s+под|земельн[а-яё]*\s+участ/iu.test(title) ? 'Участок'
+                : /квартир|евродвуш|комнатная\s+Чешка/iu.test(title) ? 'Квартира'
+                : /дача|дачн/iu.test(title) ? 'Дача'
+                : /дом|коттедж/iu.test(title) ? 'Дом' : null;
+            const rec = finalizeRecord({
+                id: String(row[2]).match(/baraholka\/(\d+)/u)[1],
+                title, description, type,
+                ...extractBizlidaLocation(title, description),
+                price: row[5], priceUsd: null,
+                rooms: extractNumberNear(title, /(\d+)\s*[-]?\s*(?:х\s*)?(?:комн[а-яё.]*|к)(?=$|[^а-яё])/iu)
+                    || (/тр[её]хкомнат/iu.test(text) ? 3 : /двухкомнат/iu.test(text) ? 2 : null),
+                totalArea: extractTotalAreaFromText(description),
+                floor: extractFloorFromText(description),
+                floors: extractFloorsFromText(description),
+                contractNumber: null, status: 'active', photos: row[0]
+            }, 'bizlida', `bizlida-${records.length + 1}`);
+            rec.listingUrl = String(row[2]).trim();
+            rec.publishedText = cleanString(row[6]);
+            records.push(rec);
+        }
+    }
+    if (!records.length) throw new Error('Bizlida: в файле нет объявлений.');
+    return records;
+}
+
 module.exports = {
     parseSiteJson,
     parseSiteJsonContent,
     parseIlvoXlsx,
+    parseBizlidaXlsx,
     parseKufarXml,
     finalizeRecord
 };

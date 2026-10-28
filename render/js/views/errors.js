@@ -4,12 +4,13 @@ import { renderDataTable } from '../components/table.js';
 import { closeModal, openModal } from '../components/modal.js';
 
 const SEVERITY_LABEL = { critical: 'Критическая', warning: 'Предупреждение', info: 'Информационная' };
-const SOURCE_LABELS = { site: 'Сайт', ilvo: 'ILVO', kufar: 'Kufar' };
+const SOURCE_LABELS = { site: 'Сайт', ilvo: 'ILVO', kufar: 'Kufar', bizlida: 'Bizlida' };
 const MATCHING_LABELS = {
     contract: 'По номеру договора',
     address_price: 'По адресу и цене',
     address: 'По адресу',
     descriptor: 'По цене и параметрам',
+    title: 'По точному заголовку',
     none: 'Без совпадения'
 };
 const ERROR_FIELDS = {
@@ -109,7 +110,7 @@ function detailSection(title, content, className = '') {
 function comparisonBlock(diff) {
     const values = diff.values || {};
     const isPrice = ['price', 'priceUsd'].includes(diff.field);
-    const sourceOrder = isPrice ? ['ilvo', 'site', 'kufar'] : ['site', 'ilvo', 'kufar'];
+    const sourceOrder = isPrice ? ['ilvo', 'site', 'kufar', 'bizlida'] : ['site', 'ilvo', 'kufar', 'bizlida'];
     const rows = sourceOrder
         .filter((source) => Object.prototype.hasOwnProperty.call(values, source))
         .map((source) => {
@@ -138,7 +139,7 @@ function comparisonBlock(diff) {
 }
 
 function sourcePresence(object) {
-    return el('div', { class: 'error-source-list' }, ['site', 'ilvo', 'kufar'].map((source) => {
+    return el('div', { class: 'error-source-list' }, ['site', 'ilvo', 'kufar', 'bizlida'].map((source) => {
         const present = object.presence && object.presence[source];
         return el('div', { class: `error-source-row ${present ? 'is-present' : 'is-missing'}` }, [
             el('span', { class: 'error-source-mark' }, [icon(present ? 'check' : 'errorCircle', 14)]),
@@ -160,7 +161,7 @@ function contractForms(object) {
 
 function errorReason(error) {
     const reasons = {
-        'Разная цена': 'ILVO является эталонным источником цены. Ошибка появляется, если цена на сайте или в Kufar отличается от цены в ILVO больше допустимой погрешности.',
+        'Разная цена': 'ILVO является эталонным источником цены. Ошибка появляется, если цена на сайте, в Kufar или Bizlida отличается от цены в ILVO больше допустимой погрешности.',
         'Разная площадь': 'В карточках одного объекта указана разная площадь. Из-за этого данные об объекте нельзя считать одинаковыми.',
         'Разный адрес': 'Адреса источников не удалось признать одним и тем же адресом после нормализации.',
         'Разное количество комнат': 'Количество комнат в источниках различается.',
@@ -171,6 +172,7 @@ function errorReason(error) {
         'Объект отсутствует на сайте': 'Объект найден в другом источнике, но для него нет соответствующей записи на сайте.',
         'Объект отсутствует в ILVO': 'Объект найден в другом источнике, но для него нет записи в эталонном источнике ILVO.',
         'Объект отсутствует в Kufar': 'Объект найден на сайте или в ILVO, но для него нет соответствующей записи в Kufar.',
+        'Объект отсутствует в Bizlida': 'Для активного объекта не найдено соответствующей записи в выгрузке Bizlida. Проверьте полноту XLSX и данные объявления: при неоднозначном совпадении записи не объединяются.',
         'Нет договора': 'У объекта нет распознанного номера договора ни в одном из загруженных источников.',
         'Разные данные договора': 'Один и тот же объект связан с разными номерами договоров в источниках.',
         'Разные разделители номера договора': 'Смысл номера договора совпадает, но в источниках используются разные разделители, например «41/1» и «41-1».',
@@ -250,7 +252,7 @@ function openErrorDetails(error, report) {
             detailMeta('Название', object.title || '—'),
             detailMeta('Номер договора', object.contractNumber || 'Нет номера'),
             detailMeta('Сопоставление', MATCHING_LABELS[object.matchedBy] || '—'),
-            detailMeta('Присутствие', `${Object.values(object.presence || {}).filter(Boolean).length} из 3 источников`)
+            detailMeta('Присутствие', `${Object.values(object.presence || {}).filter(Boolean).length} из 4 источников`)
         ])));
     } else if (contract) {
         body.push(detailSection('Договор', el('div', { class: 'error-detail-meta' }, [
@@ -269,7 +271,8 @@ function openErrorDetails(error, report) {
 
     if (error.type === 'Объект отсутствует на сайте'
         || error.type === 'Объект отсутствует в ILVO'
-        || error.type === 'Объект отсутствует в Kufar') {
+        || error.type === 'Объект отсутствует в Kufar'
+        || error.type === 'Объект отсутствует в Bizlida') {
         body.push(detailSection('Наличие записи по источникам', sourcePresence(object)));
     }
 

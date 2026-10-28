@@ -81,7 +81,8 @@ const UI_ICON_ASSETS = {
 const SOURCE_ASSETS = {
     site: { path: 'accets/germes.webp', label: 'Сайт ГермесГарант' },
     ilvo: { path: 'accets/ilvo.png', label: 'ILVO CRM' },
-    kufar: { path: 'accets/kufar.png', label: 'Kufar' }
+    kufar: { path: 'accets/kufar.png', label: 'Kufar' },
+    bizlida: { path: 'accets/bizlida.jpeg', label: 'Bizlida' }
 };
 
 export function icon(name, size = 18) {

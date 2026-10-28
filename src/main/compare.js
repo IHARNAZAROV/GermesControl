@@ -13,7 +13,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 12;
+const REPORT_MATCHING_VERSION = 13;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -102,7 +102,8 @@ function fieldsDiffer(a, b, field) {
     return String(a).trim().toLowerCase() !== String(b).trim().toLowerCase();
 }
 
-const SRC_ORDER = ['site', 'ilvo', 'kufar'];
+const SRC_ORDER = ['site', 'ilvo', 'kufar', 'bizlida'];
+const SOURCE_LABELS = { site: 'Сайт', ilvo: 'ILVO', kufar: 'Kufar', bizlida: 'Bizlida' };
 
 function recordContractKey(record) {
     return extractContractKey(record && (
@@ -206,7 +207,7 @@ function collapseSourceDuplicates(records) {
         // с улицей без номера не объединяем: на одной улице могут быть
         // разные объекты.
         const addressHasNumber = addressKey && /\d/.test(addressKey);
-        const identity = contractKey
+        const identity = record.source === 'bizlida' ? `listing:${record.id}` : contractKey
             ? `contract:${contractKey}`
             : (addressHasNumber ? `address:${addressKey}` : null);
         const existingIndex = identity ? byIdentity.get(identity) : undefined;
@@ -274,8 +275,8 @@ function formatObjectTitle(record) {
     const rawAddress = String(record.address || '').trim().replace(/\s+/g, ' ');
     let addressPhrase = '';
     if (rawAddress) {
-        const streetMatch = rawAddress.match(/^(?:ул\.?|улица)\s*(.+)$/i);
-        const avenueMatch = rawAddress.match(/^(?:пр\.?|проспект)\s*(.+)$/i);
+        const streetMatch = rawAddress.match(/^(?:ул(?:\.|\s)|улица\s)\s*(.+)$/i);
+        const avenueMatch = rawAddress.match(/^(?:пр(?:\.|\s)|пр-т(?:\.|\s)|проспект\s)\s*(.+)$/i);
         if (streetMatch) addressPhrase = `на улице ${streetMatch[1]}`;
         else if (avenueMatch) addressPhrase = `на проспекте ${avenueMatch[1]}`;
         else addressPhrase = `по адресу ${rawAddress}`;
@@ -337,8 +338,9 @@ function descriptorMatches(a, b) {
 }
 
 function addressMatches(a, b) {
-    const addressA = recordAddressKey(a);
-    const addressB = recordAddressKey(b);
+    const bizlidaPair = a?.source === 'bizlida' || b?.source === 'bizlida';
+    const addressA = recordAddressKey(bizlidaPair ? bizlidaAddressRecord(a) : a);
+    const addressB = recordAddressKey(bizlidaPair ? bizlidaAddressRecord(b) : b);
     if (!addressA || !addressB) return false;
     if (addressA === addressB) return true;
 
@@ -353,6 +355,39 @@ function addressMatches(a, b) {
     return hasAddressNumber(addressA)
         && hasAddressNumber(addressB)
         && compactContains(addressA, addressB);
+}
+
+function bizlidaAddressRecord(record) {
+    if (!record) return record;
+    return { ...record, address: String(record.address || '')
+        .replace(/(\d+)\s*\/\s*(\d+)/gu, '$1 корпус $2')
+        // «на улице Аэродромной» и «ул. Аэродромная» — один адрес.
+        .replace(/([А-Яа-яЁё]+)(?:ая|ой)(?=$|[\s,.])/gu, '$1ая') };
+}
+
+function bizlidaCityMatches(rec, existing) {
+    if (!rec.city) return true;
+    const city = cleanLocationText(rec.city);
+    const fullLocation = cleanLocationText(`${existing.city || ''} ${existing.address || ''} ${existing.title || ''}`);
+    return isSubsetMatch(tokenSet(city), tokenSet(fullLocation));
+}
+
+function hasSpecificHouseAddress(record) {
+    // Число в названии улицы («7 Ноября») само по себе не является домом.
+    const address = cleanLocationText(bizlidaAddressRecord(record)?.address);
+    return /[a-zа-яё]\s+\d+[a-zа-яё]?(?:\s|$)/iu.test(address);
+}
+
+function conflictingBizlidaCharacteristics(a, b) {
+    for (const key of ['type', 'dealType', 'rooms', 'totalArea', 'livingArea', 'kitchenArea', 'floor', 'floors']) {
+        if (!hasRecordValue(a[key]) || !hasRecordValue(b[key])) continue;
+        if (['type', 'dealType'].includes(key)) {
+            if (normalizedComparableText(a[key]) !== normalizedComparableText(b[key])) return true;
+        } else if (!numericValuesMatch(a[key], b[key], key.endsWith('Area') ? 0.01 : 0)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -371,29 +406,58 @@ function buildMatchGroups(bySource) {
     function findMatch(group, rec) {
         const recContractKey = recordContractKey(rec);
         let best = null;
+        if (rec.source === 'bizlida') {
+            const existingRecords = Object.values(group.records).filter(Boolean);
+            const specificAddressMatch = hasSpecificHouseAddress(rec) && existingRecords.some((existing) => (
+                hasSpecificHouseAddress(existing) && addressMatches(rec, existing)
+            ));
+            // При неполном адресе проверяем ВСЮ группу, а не только удобную
+            // пару: сведения сайта не должны скрывать противоречие с ILVO.
+            if (!specificAddressMatch && existingRecords.some((existing) => (
+                conflictingBizlidaCharacteristics(rec, existing)
+            ))) return null;
+        }
 
         for (const existing of Object.values(group.records)) {
             if (!existing) continue;
+            const isBizlida = rec.source === 'bizlida' || existing.source === 'bizlida';
+            if (isBizlida && rec.city && existing.city && !bizlidaCityMatches(rec, existing)) continue;
             const existingContractKey = recordContractKey(existing);
             const contractMatch = !!(recContractKey && existingContractKey && recContractKey === existingContractKey);
-            const addressMatch = addressMatches(rec, existing);
+            let addressMatch = addressMatches(rec, existing);
             const priceMatch = pricesMatch(rec, existing);
-            const descriptorMatch = !contractMatch && !addressMatch && descriptorMatches(rec, existing);
+            // Улица без дома не идентифицирует объявление. Для Bizlida
+            // требуем цену и ещё один параметр либо точный заголовок.
+            const specificAddress = hasSpecificHouseAddress(rec) && hasSpecificHouseAddress(existing) && addressMatch;
+            const descriptorEvidence = descriptorMatches(rec, existing);
+            const titleMatch = isBizlida && (specificAddress || descriptorEvidence)
+                && normalizedComparableText(rec.title).length > 15
+                && normalizedComparableText(rec.title) === normalizedComparableText(existing.title);
+            if (isBizlida && addressMatch && !specificAddress) {
+                // Город + цена + тип или улица + цена + тип недостаточны.
+                // Требуем также комнаты/общую площадь без противоречий.
+                addressMatch = descriptorEvidence;
+            }
+            // Явно разные улицы/номера нельзя склеивать только по цене.
+            if (isBizlida && rec.address && existing.address && !addressMatches(rec, existing)) continue;
+            const descriptorMatch = !contractMatch && !addressMatch && descriptorEvidence;
 
             // Одинаковый договор объединяет записи даже при расхождении
             // адреса/цены: эти расхождения должны попасть внутрь одной
             // карточки и быть показаны пользователю как проблема.
-            if (!contractMatch && !addressMatch && !descriptorMatch) continue;
+            if (!contractMatch && !addressMatch && !descriptorMatch && !titleMatch) continue;
 
             const candidate = {
                 contractMatch,
                 addressMatch,
                 priceMatch,
                 descriptorMatch,
+                titleMatch,
                 score: (contractMatch ? 1000 : 0)
                     + (addressMatch ? 300 : 0)
                     + (descriptorMatch ? 180 : 0)
                     + (priceMatch ? 80 : 0)
+                    + (titleMatch ? 400 : 0)
             };
             if (!best || candidate.score > best.score) best = candidate;
         }
@@ -406,12 +470,14 @@ function buildMatchGroups(bySource) {
         if (match.addressMatch) group.evidence.add('address');
         if (match.priceMatch) group.evidence.add('price');
         if (match.descriptorMatch) group.evidence.add('descriptor');
+        if (match.titleMatch) group.evidence.add('title');
     }
 
     function groupBasis(group) {
         if (group.evidence.has('contract')) return 'contract';
         if (group.evidence.has('address') && group.evidence.has('price')) return 'address_price';
         if (group.evidence.has('address')) return 'address';
+        if (group.evidence.has('title')) return 'title';
         if (group.evidence.has('descriptor')) return 'descriptor';
         return 'none';
     }
@@ -424,7 +490,9 @@ function buildMatchGroups(bySource) {
                 .filter((candidate) => candidate.match)
                 .sort((a, b) => b.match.score - a.match.score);
 
-            if (candidates[0]) {
+            const ambiguous = src === 'bizlida' && candidates[1]
+                && candidates[0].match.score === candidates[1].match.score;
+            if (candidates[0] && !ambiguous) {
                 const { group, match } = candidates[0];
                 group.records[src] = rec;
                 addMatchEvidence(group, match);
@@ -466,11 +534,13 @@ const MISMATCH_TYPE_BY_FIELD = {
  * реестр договоров, возвращает единый отчёт: presence-матрицу,
  * расхождения полей, список ошибок и агрегированную статистику.
  */
-function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry = true }, previousSnapshot) {
+function runComparison({ site, ilvo, kufar, bizlida, contracts = [], includeContractRegistry = true }, previousSnapshot) {
+    const sourceKeys = bizlida === undefined ? SRC_ORDER.slice(0, 3) : SRC_ORDER;
     const sources = {
         site: collapseSourceDuplicates(site),
         ilvo: collapseSourceDuplicates(ilvo),
-        kufar: collapseSourceDuplicates(kufar)
+        kufar: collapseSourceDuplicates(kufar),
+        bizlida: collapseSourceDuplicates(bizlida)
     };
     const groups = buildMatchGroups(sources);
 
@@ -499,7 +569,9 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         const s = group.records.site || null;
         const i = group.records.ilvo || null;
         const k = group.records.kufar || null;
-        const presence = { site: !!s, ilvo: !!i, kufar: !!k };
+        const b = group.records.bizlida || null;
+        const records = [s, i, k, b];
+        const presence = Object.fromEntries(sourceKeys.map((key) => [key, !!group.records[key]]));
         // Статус sold на сайте определяет снятие объекта с продажи. Неактивную
         // запись ILVO также не следует считать активным пропуском на площадке.
         const soldRecord = isSoldSiteRecord(s) ? s : null;
@@ -507,11 +579,11 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         const lifecycleRecords = [soldRecord, inactiveRecord].filter(Boolean);
         const listingStatus = soldRecord ? 'sold' : inactiveRecord ? 'inactive' : 'active';
         const listingStatusDate = lifecycleRecords.map((record) => record.statusDate).find(hasRecordValue) || null;
-        const primary = s || i || k;
+        const primary = s || i || k || b;
         const objectNumber = objSeq;
         const id = `MATCH-${String(objSeq++).padStart(4, '0')}`;
         const target = objectNumber;
-        for (const record of [s, i, k]) {
+        for (const record of records) {
             if (!record) continue;
             for (const sourceId of [record.id, ...(record._sourceIds || [])]) {
                 if (sourceId) objectIdAliases.set(sourceId, id);
@@ -519,35 +591,36 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         }
 
         const fieldDiffs = [];
-        const pairs = [
-            ['site', 'ilvo', s, i],
-            ['site', 'kufar', s, k],
-            ['ilvo', 'kufar', i, k]
-        ];
+        const pairs = sourceKeys.flatMap((a, index) => sourceKeys.slice(index + 1)
+            .map((b) => [a, b, group.records[a], group.records[b]]));
 
         // Проданный объект остаётся в реестре и статистике, но его данные
         // больше не проверяются: он уже не является активным объявлением.
         if (listingStatus !== 'sold') {
             for (const field of COMPARABLE_FIELDS) {
-                const values = { site: s ? s[field.key] : undefined, ilvo: i ? i[field.key] : undefined, kufar: k ? k[field.key] : undefined };
+                const values = Object.fromEntries(sourceKeys.map((key) => [key, group.records[key]?.[field.key]]));
                 let mismatch = false;
                 // ILVO is the source of truth for prices. Do not compare the
                 // website directly with Kufar: each external price must be
                 // checked against the ILVO price instead.
                 const comparisonPairs = ['price', 'priceUsd'].includes(field.key)
-                    ? (i ? [
-                        ['site', 'ilvo', s, i],
-                        ['ilvo', 'kufar', i, k]
-                    ] : [])
+                    ? (i ? sourceKeys.filter((key) => key !== 'ilvo')
+                        .map((key) => ['ilvo', key, i, group.records[key]]) : [])
                     : pairs;
                 for (const [srcA, srcB, recA, recB] of comparisonPairs) {
-                    if (recA && recB && fieldsDiffer(recA[field.key], recB[field.key], field)) mismatch = true;
+                    if (recA && recB) {
+                        const bizlidaAddress = field.key === 'address' && [srcA, srcB].includes('bizlida');
+                        const valueA = bizlidaAddress ? bizlidaAddressRecord(recA).address : recA[field.key];
+                        const valueB = bizlidaAddress ? bizlidaAddressRecord(recB).address : recB[field.key];
+                        if (fieldsDiffer(valueA, valueB, field)) mismatch = true;
+                    }
                 }
                 if (mismatch) {
                     fieldDiffs.push({ field: field.key, label: field.label, values, unit: field.unit || null });
                     const errType = MISMATCH_TYPE_BY_FIELD[field.key] || ERROR_TYPES.OTHER;
                     if (!errors.some((e) => e.type === errType && e.target === target)) {
-                        pushError(errType, `${field.label}: значения расходятся между источниками`, target, 'Сайт / ILVO / Kufar');
+                        pushError(errType, `${field.label}: значения расходятся между источниками`, target,
+                            sourceKeys.filter((key) => presence[key]).map((key) => SOURCE_LABELS[key]).join(' / '));
                     }
                 }
             }
@@ -557,17 +630,18 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         const contractNumber = [s, i, k]
             .map(recordContractKey)
             .find(Boolean) || null;
-        const presentSourcesCount = [presence.site, presence.ilvo, presence.kufar].filter(Boolean).length;
-        if (listingStatus !== 'sold' && !contractNumber && presentSourcesCount > 0) {
+        const presentSourcesCount = Object.values(presence).filter(Boolean).length;
+        const contractSourcesCount = [s, i, k].filter(Boolean).length;
+        if (listingStatus !== 'sold' && !contractNumber && contractSourcesCount > 0) {
             pushError(ERROR_TYPES.NO_CONTRACT, 'У объекта не указан номер договора', target, presence.site ? 'Сайт' : (presence.ilvo ? 'ILVO' : 'Kufar'));
         }
         // Расхождение номера договора между источниками: номера не совпадают
         // либо номер указан только в части источников.
         const contractValues = [s, i, k].filter(Boolean).map(recordContractKey).filter(Boolean);
         const uniqueContracts = new Set(contractValues);
-        const hasMissingContractInGroup = presentSourcesCount > 1
+        const hasMissingContractInGroup = contractSourcesCount > 1
             && contractValues.length > 0
-            && contractValues.length < presentSourcesCount;
+            && contractValues.length < contractSourcesCount;
         if (listingStatus !== 'sold' && (uniqueContracts.size > 1 || hasMissingContractInGroup)) {
             const description = uniqueContracts.size > 1
                 ? 'Номер договора отличается между источниками'
@@ -604,13 +678,15 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             }
         }
 
-        if (presentSourcesCount > 1 && listingStatus === 'active') {
-            if (!presence.site) pushError(ERROR_TYPES.MISSING_SITE, 'Объект есть в других источниках, но отсутствует на сайте', target, presence.ilvo ? 'ILVO' : 'Kufar');
-            if (!presence.ilvo) pushError(ERROR_TYPES.MISSING_ILVO, 'Объект есть в других источниках, но отсутствует в ILVO', target, presence.site ? 'Сайт' : 'Kufar');
-            if (!presence.kufar) pushError(ERROR_TYPES.MISSING_KUFAR, 'Объект есть в других источниках, но отсутствует в Kufar', target, presence.site ? 'Сайт' : 'ILVO');
+        if (listingStatus === 'active') {
+            for (const key of sourceKeys) {
+                if (!presence[key]) pushError(ERROR_TYPES[`MISSING_${key.toUpperCase()}`],
+                    `Объект есть в других источниках, но отсутствует в ${SOURCE_LABELS[key]}`, target,
+                    sourceKeys.filter((source) => presence[source]).map((source) => SOURCE_LABELS[source]).join(' / '));
+            }
         }
 
-        const hasMissingSource = listingStatus === 'active' && presentSourcesCount < 3;
+        const hasMissingSource = listingStatus === 'active' && presentSourcesCount < sourceKeys.length;
         let status = listingStatus === 'sold' ? 'ok' : (hasMissingSource ? 'missing' : 'ok');
         // Любая ошибка, относящаяся к этой карточке, должна отражаться
         // в её статусе, а не только расхождения полей из COMPARABLE_FIELDS.
@@ -624,11 +700,11 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             // A source can contain the object while omitting individual
             // fields. Keep the source priority for conflicting values, but
             // fill gaps from the other records in the same matched group.
-            merged[field.key] = [s, i, k]
+            merged[field.key] = records
                 .map((record) => record && record[field.key])
                 .find(hasRecordValue) ?? null;
         }
-        merged.photos = [...new Set([s, i, k]
+        merged.photos = [...new Set(records
             .flatMap((record) => Array.isArray(record?.photos) ? record.photos : []))];
         // В отчёте показываем единый нормализованный номер, а не
         // случайную исходную форму из одного из источников.
@@ -643,7 +719,7 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
             ...merged,
             id,
             objectNumber,
-            title: formatObjectTitle(merged),
+            title: b && !s && !i && !k ? b.title : formatObjectTitle(merged),
             presence,
             matchedBy: group.matchedBy,
             matchConfidence: group.matchedBy === 'contract' || group.matchedBy === 'address_price' ? 'strong' : (group.matchedBy === 'none' ? 'none' : 'review'),
@@ -756,21 +832,21 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
     const activeObjects = objects.filter((o) => o.listingStatus === 'active');
     const soldObjects = objects.filter((o) => o.listingStatus === 'sold');
     const inactiveObjects = objects.filter((o) => o.listingStatus === 'inactive');
-    const everywhere = activeObjects.filter((o) => o.presence.site && o.presence.ilvo && o.presence.kufar).length;
-    const categories = {
-        everywhere,
-        onlySite: activeObjects.filter((o) => o.presence.site && !o.presence.ilvo && !o.presence.kufar).length,
-        onlyIlvo: activeObjects.filter((o) => !o.presence.site && o.presence.ilvo && !o.presence.kufar).length,
-        onlyKufar: activeObjects.filter((o) => !o.presence.site && !o.presence.ilvo && o.presence.kufar).length,
-        missingSite: activeObjects.filter((o) => !o.presence.site && (o.presence.ilvo || o.presence.kufar)).length,
-        missingIlvo: activeObjects.filter((o) => !o.presence.ilvo && (o.presence.site || o.presence.kufar)).length,
-        missingKufar: activeObjects.filter((o) => !o.presence.kufar && (o.presence.site || o.presence.ilvo)).length
-    };
+    const everywhere = activeObjects.filter((o) => sourceKeys.every((key) => o.presence[key])).length;
+    const categories = { everywhere };
+    for (const key of SRC_ORDER) {
+        const suffix = key.charAt(0).toUpperCase() + key.slice(1);
+        categories[`only${suffix}`] = activeObjects.filter((o) => o.presence[key]
+            && sourceKeys.every((other) => other === key || !o.presence[other])).length;
+        categories[`missing${suffix}`] = sourceKeys.includes(key)
+            ? activeObjects.filter((o) => !o.presence[key]).length : 0;
+    }
 
     const stats = {
         siteCount: sources.site.length,
         ilvoCount: sources.ilvo.length,
         kufarCount: sources.kufar.length,
+        bizlidaCount: sources.bizlida.length,
         totalUnique: total,
         matchPercent: activeObjects.length ? Math.round((everywhere / activeObjects.length) * 1000) / 10 : 0,
         problemsCount: objects.filter((o) => o.status !== 'ok').length,
@@ -782,21 +858,23 @@ function runComparison({ site, ilvo, kufar, contracts, includeContractRegistry =
         soldCount: soldObjects.length,
         inactiveCount: inactiveObjects.length,
         withContract: objects.filter((o) => !!o.contractNumber).length,
-        withoutContract: objects.filter((o) => !o.contractNumber).length
+        withoutContract: objects.filter((o) => !o.contractNumber && (o.presence.site || o.presence.ilvo || o.presence.kufar)).length
     };
 
-    let deltas = { site: 0, ilvo: 0, kufar: 0, problems: 0 };
+    let deltas = { site: 0, ilvo: 0, kufar: 0, bizlida: 0, problems: 0 };
     if (previousSnapshot && previousSnapshot.stats) {
         deltas = {
             site: stats.siteCount - previousSnapshot.stats.siteCount,
             ilvo: stats.ilvoCount - previousSnapshot.stats.ilvoCount,
             kufar: stats.kufarCount - previousSnapshot.stats.kufarCount,
+            bizlida: stats.bizlidaCount - (previousSnapshot.stats.bizlidaCount || 0),
             problems: stats.problemsCount - previousSnapshot.stats.problemsCount
         };
     }
 
     return {
         matchingVersion: REPORT_MATCHING_VERSION,
+        sourceKeys,
         contractRegistrySource: includeContractRegistry ? 'demo' : 'objects',
         checkedAt: new Date().toISOString(),
         objects,

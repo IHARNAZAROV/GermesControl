@@ -154,3 +154,33 @@ source and the old demo state remains alongside it.
 **How to apply:** preserve the demo registry only when all three source
 metadata records are explicitly marked as demo; never merge it into a report
 for real imported data.
+
+## Bizlida export constraints
+
+The user confirmed that Bizlida export prices are BYN. They explicitly require
+Bizlida to participate in all listing comparisons/statistics, but never in
+contract checks because its export has no contracts.
+
+**Why:** the user supplied a headerless, seven-column scraped listing export
+with shortened descriptions, not structured property or contract data. Many
+ads omit a house number or any address, so apparent absence can mean there
+was not enough information for an unambiguous match.
+
+**How to apply:** preserve unknown fields as unknown; do not invent house
+numbers, default every locality to Lida, or use the agency's boilerplate office
+address. Do not resolve equal-strength candidates by list order. Settlement
+information may be inside another source's full address even when its city
+field contains only the district.
+
+For incomplete Bizlida addresses, favor an unconfirmed match over falsely
+confirming coverage. Same town/street + same price + a generic property type
+is not enough; available room counts and areas must not contradict any
+source in the existing group.
+
+**Why:** a false positive hides a genuinely missing advertisement. A sole
+candidate can still be the wrong property; checking only for tied candidates
+does not protect against this.
+
+**How to apply:** require property-specific corroboration for incomplete
+addresses and include negative cases with a single conflicting candidate,
+not just ambiguity between two candidates.

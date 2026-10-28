@@ -81,6 +81,7 @@ export function renderDashboard(container) {
         kpiCard({ logo: 'site', value: stats.siteCount, label: 'Объекты на сайте', delta: deltas.site, tone: 'site' }),
         kpiCard({ logo: 'ilvo', value: stats.ilvoCount, label: 'Объекты в ILVO', delta: deltas.ilvo, tone: 'ilvo' }),
         kpiCard({ logo: 'kufar', value: stats.kufarCount, label: 'Объекты в Kufar', delta: deltas.kufar, tone: 'kufar' }),
+        kpiCard({ logo: 'bizlida', value: stats.bizlidaCount || 0, label: 'Объекты в Bizlida', delta: deltas.bizlida, tone: 'bizlida' }),
         kpiCard({ icon: 'alert', value: stats.problemsCount, label: 'Проблемы', danger: true, delta: deltas.problems })
     ]);
     container.appendChild(kpis);
@@ -90,13 +91,15 @@ export function renderDashboard(container) {
         { label: 'На всех площадках', value: cat.everywhere, color: '#155945' },
         { label: 'Отсутствуют на сайте', value: cat.missingSite, color: '#D97706' },
         { label: 'Отсутствуют в Kufar', value: cat.missingKufar, color: '#DC2626' },
+        { label: 'Отсутствуют в Bizlida', value: cat.missingBizlida || 0, color: '#457BB5' },
         { label: 'Отсутствуют в ILVO', value: cat.missingIlvo, color: '#6B7280' }
     ];
     const total = segments.reduce((s, x) => s + x.value, 0) || 1;
     const sources = [
         { key: 'ilvo', label: 'ILVO CRM', count: stats.ilvoCount },
         { key: 'site', label: 'Сайт ГермесГарант', count: stats.siteCount },
-        { key: 'kufar', label: 'Kufar', count: stats.kufarCount }
+        { key: 'kufar', label: 'Kufar', count: stats.kufarCount },
+        { key: 'bizlida', label: 'Bizlida', count: stats.bizlidaCount || 0 }
     ];
 
     const donutCard = el('div', { class: 'card card-pad' }, [

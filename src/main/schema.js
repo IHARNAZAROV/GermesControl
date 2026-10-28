@@ -2,7 +2,7 @@
 
 /**
  * Единая схема объекта недвижимости, используемая при импорте
- * из всех трёх источников (Сайт / ILVO / Kufar).
+ * из четырёх источников (Сайт / ILVO / Kufar / Bizlida).
  */
 const OBJECT_FIELDS = [
     { key: 'id', label: 'ID', compare: false },
@@ -27,7 +27,8 @@ const OBJECT_FIELDS = [
 const SOURCES = {
     site: { key: 'site', label: 'Сайт ГермесГарант', short: 'Сайт', format: 'JSON' },
     ilvo: { key: 'ilvo', label: 'ILVO CRM', short: 'ILVO', format: 'XLSX' },
-    kufar: { key: 'kufar', label: 'Kufar', short: 'Kufar', format: 'XML' }
+    kufar: { key: 'kufar', label: 'Kufar', short: 'Kufar', format: 'XML' },
+    bizlida: { key: 'bizlida', label: 'Bizlida', short: 'Bizlida', format: 'XLSX' }
 };
 
 const ERROR_TYPES = {
@@ -37,6 +38,7 @@ const ERROR_TYPES = {
     MISSING_SITE: 'Объект отсутствует на сайте',
     MISSING_ILVO: 'Объект отсутствует в ILVO',
     MISSING_KUFAR: 'Объект отсутствует в Kufar',
+    MISSING_BIZLIDA: 'Объект отсутствует в Bizlida',
     PRICE_MISMATCH: 'Разная цена',
     AREA_MISMATCH: 'Разная площадь',
     ADDRESS_MISMATCH: 'Разный адрес',
@@ -63,6 +65,7 @@ const ERROR_SEVERITY = {
     [ERROR_TYPES.MISSING_SITE]: SEVERITY.CRITICAL,
     [ERROR_TYPES.MISSING_ILVO]: SEVERITY.CRITICAL,
     [ERROR_TYPES.MISSING_KUFAR]: SEVERITY.WARNING,
+    [ERROR_TYPES.MISSING_BIZLIDA]: SEVERITY.WARNING,
     [ERROR_TYPES.PRICE_MISMATCH]: SEVERITY.WARNING,
     [ERROR_TYPES.AREA_MISMATCH]: SEVERITY.WARNING,
     [ERROR_TYPES.ADDRESS_MISMATCH]: SEVERITY.INFO,
@@ -166,6 +169,8 @@ function cleanLocationText(s) {
     return String(s || '')
         .toLowerCase()
         .normalize('NFKC')
+        .replace(/ё/g, 'е')
+        .replace(/(?<![а-я])(?:пр-т|проспект|деревня|деревне|городской поселок|городском поселке)(?![а-я])/giu, ' ')
         .replace(/(?:корпус|корп)\.?\s*/giu, 'к ')
         .replace(/(\d)\s*к\s*(?=\d)/giu, '$1 к ')
         // В выгрузке Kufar корпус может приходить как «60-2».

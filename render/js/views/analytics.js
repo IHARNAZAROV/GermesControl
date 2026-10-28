@@ -7,13 +7,15 @@ import { renderDataTable } from '../components/table.js';
 const SOURCE_LABELS = {
     site: 'Сайт',
     ilvo: 'ILVO',
-    kufar: 'Kufar'
+    kufar: 'Kufar',
+    bizlida: 'Bizlida'
 };
 
 const SOURCE_COLORS = {
     site: '#155945',
     ilvo: '#6A7FDB',
-    kufar: '#D18A32'
+    kufar: '#D18A32',
+    bizlida: '#457BB5'
 };
 
 const STATUS_COLORS = {
@@ -95,7 +97,7 @@ function countBy(items, getKey) {
 
 function formatCoverage(object) {
     const present = Object.values(object.presence || {}).filter(Boolean).length;
-    return `${present} из 3`;
+    return `${present} из 4`;
 }
 
 function getObjectErrorCounts(report) {
@@ -137,7 +139,7 @@ function renderSourceCard(report) {
     const categories = report.categories || {};
     const total = stats.totalUnique || 0;
     const active = stats.activeCount || 0;
-    const sourceItems = ['site', 'ilvo', 'kufar'].map((key) => ({
+    const sourceItems = ['site', 'ilvo', 'kufar', 'bizlida'].map((key) => ({
         label: SOURCE_LABELS[key],
         value: stats[`${key}Count`] || 0,
         valueLabel: `${stats[`${key}Count`] || 0} · ${percent(stats[`${key}Count`] || 0, total)}%`,
@@ -146,7 +148,8 @@ function renderSourceCard(report) {
     const categoryItems = [
         { label: 'Нет на сайте', value: categories.missingSite || 0, color: '#DC2626' },
         { label: 'Нет в ILVO', value: categories.missingIlvo || 0, color: '#6A7FDB' },
-        { label: 'Нет в Kufar', value: categories.missingKufar || 0, color: '#D18A32' }
+        { label: 'Нет в Kufar', value: categories.missingKufar || 0, color: '#D18A32' },
+        { label: 'Нет в Bizlida', value: categories.missingBizlida || 0, color: '#457BB5' }
     ];
 
     return analyticsCard(
@@ -158,7 +161,7 @@ function renderSourceCard(report) {
             barList(categoryItems, 'Все активные объекты присутствуют во всех источниках'),
             el('div', { class: 'analytics-insight' }, [
                 el('strong', {}, `${categories.everywhere || 0} из ${active}`),
-                ` активных объектов есть на всех трёх площадках`
+                ` активных объектов есть на всех четырёх площадках`
             ])
         ])
     );
@@ -387,7 +390,7 @@ export function renderAnalytics(container) {
         tile(allPlatformsCount, 'На всех площадках', `${percent(allPlatformsCount, stats.activeCount || 0)}% активной базы`),
         tile(stats.problemsCount, 'Требуют внимания', `${percent(stats.problemsCount, allObjectsCount)}% реестра`),
         tile(stats.errorsCount, 'Записей ошибок', `${stats.criticalCount || 0} критических`),
-        tile(`${percent(stats.withContract || 0, allObjectsCount)}%`, 'Договоры заполнены', `${stats.withoutContract || 0} без договора`)
+        tile(`${percent(stats.withContract || 0, (stats.withContract || 0) + (stats.withoutContract || 0))}%`, 'Договоры заполнены', `${stats.withoutContract || 0} без договора · Bizlida не проверяется`)
     ]));
 
     container.appendChild(el('div', { class: 'analytics-grid' }, [

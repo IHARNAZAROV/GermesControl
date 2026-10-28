@@ -43,13 +43,15 @@ export function renderComparison(container) {
 
     const cat = report.categories;
     const cards = [
-        { label: 'Есть везде', value: cat.everywhere, sources: ['site', 'ilvo', 'kufar'] },
+        { label: 'Есть везде', value: cat.everywhere, sources: ['site', 'ilvo', 'kufar', 'bizlida'] },
         { label: 'Только на сайте', value: cat.onlySite, sources: ['site'] },
         { label: 'Только в ILVO', value: cat.onlyIlvo, sources: ['ilvo'] },
         { label: 'Только в Kufar', value: cat.onlyKufar, sources: ['kufar'] },
+        { label: 'Только в Bizlida', value: cat.onlyBizlida || 0, sources: ['bizlida'] },
         { label: 'Нет на сайте', value: cat.missingSite, sources: ['site'] },
         { label: 'Нет в ILVO', value: cat.missingIlvo, sources: ['ilvo'] },
         { label: 'Нет в Kufar', value: cat.missingKufar, sources: ['kufar'] },
+        { label: 'Нет в Bizlida', value: cat.missingBizlida || 0, sources: ['bizlida'] },
         { label: 'Сняты с продажи', value: report.stats.soldCount || 0, sources: [] },
         { label: 'Неактивны в ILVO', value: report.stats.inactiveCount || 0, sources: ['ilvo'] }
     ];
@@ -89,6 +91,7 @@ export function renderComparison(container) {
                 { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => chip(o.presence.site, o.listingStatus === 'sold') },
                 { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => chip(o.presence.ilvo) },
                 { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => chip(o.presence.kufar) },
+                { key: 'bizlida', label: 'Bizlida', sortValue: (o) => o.presence.bizlida, render: (o) => chip(o.presence.bizlida) },
                 { key: 'listingStatus', label: 'Статус размещения', render: listingBadge }
             ],
             rows,

@@ -8,6 +8,7 @@ const {
     parseSiteJson,
     parseSiteJsonContent,
     parseIlvoXlsx,
+    parseBizlidaXlsx,
     parseKufarXml
 } = require('./parsers');
 const { runComparison } = require('./compare');
@@ -17,7 +18,8 @@ const { SOURCES } = require('./schema');
 const FILE_FILTERS = {
     site: [{ name: 'JSON', extensions: ['json'] }],
     ilvo: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
-    kufar: [{ name: 'XML', extensions: ['xml'] }]
+    kufar: [{ name: 'XML', extensions: ['xml'] }],
+    bizlida: [{ name: 'Excel', extensions: ['xlsx'] }]
 };
 
 const REPORT_FORMAT = 'xlsx';
@@ -41,6 +43,7 @@ async function importFromPath(sourceKey, filePath) {
     let records;
     if (sourceKey === 'site') records = await parseSiteJson(filePath);
     else if (sourceKey === 'ilvo') records = await parseIlvoXlsx(filePath);
+    else if (sourceKey === 'bizlida') records = await parseBizlidaXlsx(filePath);
     else if (sourceKey === 'kufar') records = await parseKufarXml(filePath, false);
     else throw new Error('Неизвестный источник: ' + sourceKey);
 
@@ -139,6 +142,7 @@ function registerIpcHandlers(getMainWindow) {
             site,
             ilvo,
             kufar,
+            bizlida: state.sources.bizlida?.data || [],
             contracts: state.contracts || [],
             includeContractRegistry: allSourcesAreDemo
         }, previous);

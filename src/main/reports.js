@@ -17,7 +17,8 @@ const REPORT_LABELS = {
 const SOURCE_LABELS = {
     site: 'Сайт',
     ilvo: 'ILVO',
-    kufar: 'Kufar'
+    kufar: 'Kufar',
+    bizlida: 'Bizlida'
 };
 
 const SOURCE_KEYS = Object.keys(SOURCE_LABELS);
@@ -44,6 +45,7 @@ const MATCHING_LABELS = {
     address_price: 'По адресу и цене',
     address: 'По адресу',
     descriptor: 'По цене и параметрам',
+    title: 'По точному заголовку',
     none: 'Без совпадения'
 };
 
@@ -52,7 +54,7 @@ const OBJECT_REPORT_COLUMNS = [
     'Цена, BYN', 'Цена, USD', 'Общая площадь, м²', 'Жилая площадь, м²',
     'Площадь кухни, м²', 'Комнат', 'Этаж', 'Этажность', 'Номер договора',
     'Статус размещения', 'Дата снятия / деактивации', 'Есть на сайте',
-    'Есть в ILVO', 'Есть в Kufar', 'Источники', 'Метод сопоставления',
+    'Есть в ILVO', 'Есть в Kufar', 'Есть в Bizlida', 'Источники', 'Метод сопоставления',
     'Уверенность сопоставления', 'Статус данных', 'Количество расхождений',
     'Количество ошибок'
 ];
@@ -72,11 +74,11 @@ const REPORT_COLUMNS = {
         'ID ошибки', 'Тип', 'Важность', 'Статус', '№ объекта', 'Объект',
         'Город', 'Адрес', 'Номер договора', 'Объект / договор', 'Источник',
         'Дата проверки', 'Описание', 'Значение — Сайт', 'Значение — ILVO',
-        'Значение — Kufar', 'Что проверить'
+        'Значение — Kufar', 'Значение — Bizlida', 'Что проверить'
     ],
     diffs: [
         '№ объекта', 'Объект', 'Город', 'Адрес', 'Номер договора', 'Поле',
-        'Единица', 'Значение — Сайт', 'Значение — ILVO', 'Значение — Kufar',
+        'Единица', 'Значение — Сайт', 'Значение — ILVO', 'Значение — Kufar', 'Значение — Bizlida',
         'Эталон для цены', 'Статус проверки'
     ],
     full: OBJECT_REPORT_COLUMNS
@@ -105,6 +107,7 @@ const COLUMN_WIDTHS = {
     'Есть на сайте': 16,
     'Есть в ILVO': 16,
     'Есть в Kufar': 16,
+    'Есть в Bizlida': 16,
     'Источники': 28,
     'Метод сопоставления': 24,
     'Уверенность сопоставления': 22,
@@ -115,6 +118,7 @@ const COLUMN_WIDTHS = {
     'Значение — Сайт': 28,
     'Значение — ILVO': 28,
     'Значение — Kufar': 28,
+    'Значение — Bizlida': 28,
     'Что проверить': 55
 };
 
@@ -290,6 +294,7 @@ function objectColumns(object, errorCounts) {
         'Есть на сайте': presenceLabel(object.presence?.site),
         'Есть в ILVO': presenceLabel(object.presence?.ilvo),
         'Есть в Kufar': presenceLabel(object.presence?.kufar),
+        'Есть в Bizlida': presenceLabel(object.presence?.bizlida),
         Источники: objectSourceSummary(object),
         'Метод сопоставления': matchingLabel(object.matchedBy),
         'Уверенность сопоставления': confidenceLabel(object.matchConfidence),
@@ -378,6 +383,7 @@ function buildRows(reportType, report) {
                     'Значение — Сайт': valueOrDash(diff?.values?.site),
                     'Значение — ILVO': valueOrDash(diff?.values?.ilvo),
                     'Значение — Kufar': valueOrDash(diff?.values?.kufar),
+                    'Значение — Bizlida': valueOrDash(diff?.values?.bizlida),
                     'Что проверить': errorAction(error)
                 };
             });
@@ -396,6 +402,7 @@ function buildRows(reportType, report) {
                     'Значение — Сайт': valueOrDash(diff.values?.site),
                     'Значение — ILVO': valueOrDash(diff.values?.ilvo),
                     'Значение — Kufar': valueOrDash(diff.values?.kufar),
+                    'Значение — Bizlida': valueOrDash(diff.values?.bizlida),
                     'Эталон для цены': ['price', 'priceUsd'].includes(diff.field) ? 'ILVO' : '—',
                     'Статус проверки': 'Требует проверки'
                 })));
@@ -415,7 +422,8 @@ function reportSpecificSummary(reportType, rows, report) {
             ['Проверяемый показатель', 'Количество'],
             ['Отсутствуют на сайте', rows.filter((row) => String(row['Отсутствует в источниках']).includes('Сайт')).length],
             ['Отсутствуют в ILVO', rows.filter((row) => String(row['Отсутствует в источниках']).includes('ILVO')).length],
-            ['Отсутствуют в Kufar', rows.filter((row) => String(row['Отсутствует в источниках']).includes('Kufar')).length]
+            ['Отсутствуют в Kufar', rows.filter((row) => String(row['Отсутствует в источниках']).includes('Kufar')).length],
+            ['Отсутствуют в Bizlida', rows.filter((row) => String(row['Отсутствует в источниках']).includes('Bizlida')).length]
         ];
     }
     if (reportType === 'contracts') {
@@ -515,11 +523,11 @@ function createDataSheet(title, rows, columns) {
 function createSummarySheet(reportType, report, rows, specificRows = reportSpecificSummary(reportType, rows, report)) {
     const stats = report.stats || {};
     const title = REPORT_LABELS[reportType] || 'Отчёт';
+    const maxSource = Math.max(...SOURCE_KEYS.map((key) => stats[`${key}Count`] || 0), 1);
     const sourceRows = [
         ['Источник', 'Записей загружено', 'Визуально'],
-        ['Сайт', stats.siteCount || 0, bar(stats.siteCount || 0, Math.max(stats.siteCount || 0, stats.ilvoCount || 0, stats.kufarCount || 0))],
-        ['ILVO', stats.ilvoCount || 0, bar(stats.ilvoCount || 0, Math.max(stats.siteCount || 0, stats.ilvoCount || 0, stats.kufarCount || 0))],
-        ['Kufar', stats.kufarCount || 0, bar(stats.kufarCount || 0, Math.max(stats.siteCount || 0, stats.ilvoCount || 0, stats.kufarCount || 0))]
+        ...SOURCE_KEYS.map((key) => [SOURCE_LABELS[key], stats[`${key}Count`] || 0,
+            bar(stats[`${key}Count`] || 0, maxSource)])
     ];
     const metricRows = [
         ['Показатель', 'Значение'],
@@ -601,14 +609,15 @@ function buildChartDefinitions(reportType, report, rows) {
             definition: chartDefinition('Количество записей по источникам', [
                 ['Сайт', stats.siteCount || 0],
                 ['ILVO', stats.ilvoCount || 0],
-                ['Kufar', stats.kufarCount || 0]
+                ['Kufar', stats.kufarCount || 0],
+                ['Bizlida', stats.bizlidaCount || 0]
             ]),
             formulas: [
                 "'Сводка'!$B$19",
-                "'Сводка'!$A$20:$A$22",
-                "'Сводка'!$B$20:$B$22"
+                "'Сводка'!$A$20:$A$23",
+                "'Сводка'!$B$20:$B$23"
             ],
-            colors: ['155945', 'D97706', '6A7FDB']
+            colors: ['155945', 'D97706', '6A7FDB', '457BB5']
         },
         {
             definition: chartDefinition(
@@ -617,9 +626,9 @@ function buildChartDefinitions(reportType, report, rows) {
                 'bar'
             ),
             formulas: [
-                "'Сводка'!$B$25",
-                `'Сводка'!$A$26:$A$${25 + specificRows.length - 1}`,
-                `'Сводка'!$B$26:$B$${25 + specificRows.length - 1}`
+                "'Сводка'!$B$26",
+                `'Сводка'!$A$27:$A$${26 + specificRows.length - 1}`,
+                `'Сводка'!$B$27:$B$${26 + specificRows.length - 1}`
             ],
             colors: ['287A61', 'D97706', '6A7FDB', 'DC2626', '8B1E3F', '155945']
         }

@@ -19,7 +19,7 @@ const REPORT_FILE = path.join(DATA_DIR, 'lastReport.json');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 const HISTORY_LIMIT = 200;
 const UPLOAD_RETENTION_LIMIT = 5;
-const SOURCE_KEYS = ['site', 'ilvo', 'kufar'];
+const SOURCE_KEYS = ['site', 'ilvo', 'kufar', 'bizlida'];
 let stateCache = null;
 
 const settings = new Store({
@@ -83,7 +83,8 @@ function seedInitialState() {
         sources: {
             site: { data: sample.site, meta: { fileName: 'demo: site.json', importedAt: now, count: sample.site.length, isDemo: true } },
             ilvo: { data: sample.ilvo, meta: { fileName: 'demo: ilvo.xlsx', importedAt: now, count: sample.ilvo.length, isDemo: true } },
-            kufar: { data: sample.kufar, meta: { fileName: 'demo: kufar.xml', importedAt: now, count: sample.kufar.length, isDemo: true } }
+            kufar: { data: sample.kufar, meta: { fileName: 'demo: kufar.xml', importedAt: now, count: sample.kufar.length, isDemo: true } },
+            bizlida: { data: [], meta: defaultMeta() }
         },
         contracts: sample.contracts
     };
@@ -105,6 +106,7 @@ function getState() {
     }
     try {
         const state = fs.readJsonSync(STATE_FILE);
+        state.sources.bizlida ||= { data: [], meta: defaultMeta() };
         stateCache = state;
         pruneAllUploadedFiles(state);
         return state;
@@ -127,7 +129,7 @@ function setSourceData(sourceKey, records, meta) {
     if (isRealImport) {
         // Демо-источники нельзя смешивать с первым реальным импортом:
         // иначе старые синтетические договоры и объекты остаются в отчёте.
-        for (const otherSource of ['site', 'ilvo', 'kufar']) {
+        for (const otherSource of SOURCE_KEYS) {
             if (otherSource !== sourceKey && state.sources[otherSource]?.meta?.isDemo === true) {
                 state.sources[otherSource] = { data: [], meta: defaultMeta() };
             }

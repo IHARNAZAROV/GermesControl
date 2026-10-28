@@ -6,7 +6,8 @@ import { showToast } from './toast.js';
 const SOURCE_META = {
     site: { label: 'Сайт ГермесГарант', format: 'JSON', hint: 'Автоматическая выгрузка с сайта' },
     ilvo: { label: 'ILVO CRM', format: 'XLSX', hint: 'Ручная выгрузка объектов из ILVO' },
-    kufar: { label: 'Kufar', format: 'XML', hint: 'Автоматическая выгрузка объявлений из ILVO' }
+    kufar: { label: 'Kufar', format: 'XML', hint: 'Автоматическая выгрузка объявлений из ILVO' },
+    bizlida: { label: 'Bizlida', format: 'XLSX', hint: 'Выгрузка объявлений bizlida.by без договоров' }
 };
 
 async function afterImport(onChanged) {
@@ -70,7 +71,7 @@ function sourceCard(key, onChanged) {
                 }
             }
         }, 'Из файла'));
-    } else if (key === 'ilvo') {
+    } else if (key === 'ilvo' || key === 'bizlida') {
         actions.appendChild(el('button', {
             class: 'btn btn-primary btn-sm',
             onclick: async () => {
@@ -126,7 +127,7 @@ export function openImportModal() {
     const grid = el('div', { class: 'import-grid' });
     function draw() {
         grid.innerHTML = '';
-        ['site', 'ilvo', 'kufar'].forEach((key) => grid.appendChild(sourceCard(key, draw)));
+        ['site', 'ilvo', 'kufar', 'bizlida'].forEach((key) => grid.appendChild(sourceCard(key, draw)));
     }
     draw();
 
@@ -135,7 +136,7 @@ export function openImportModal() {
         kicker: 'Источники данных',
         width: '720px',
         body: [
-            el('p', { class: 'card-subtitle', style: 'margin-bottom:16px;' }, 'Сайт ГермесГарант обновляется автоматически, ILVO загружается из XLSX, а Kufar — из XML. После обновления источников запустите проверку, чтобы обновить сводку.'),
+            el('p', { class: 'card-subtitle', style: 'margin-bottom:16px;' }, 'Сайт ГермесГарант обновляется автоматически, ILVO и Bizlida загружаются из XLSX, Kufar — из XML. Для Bizlida: 7 колонок (фото, агентство, ссылка, заголовок, описание, цена BYN, дата), без договоров. После загрузки запустите проверку.'),
             grid
         ],
         footer: [el('button', { class: 'btn btn-secondary', onclick: closeModal }, 'Закрыть')]
