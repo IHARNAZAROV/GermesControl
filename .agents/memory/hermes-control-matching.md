@@ -184,3 +184,15 @@ does not protect against this.
 **How to apply:** require property-specific corroboration for incomplete
 addresses and include negative cases with a single conflicting candidate,
 not just ambiguity between two candidates.
+
+Locationless Bizlida records must not be joined just by price, type, and rooms.
+Use independently corroborated dimensions or multiple property-specific details;
+missing location is not evidence that two locations agree. SNB area is distinct
+from total area, and garden houses may be called either Дом or Дача.
+
+**Why:** generic apartment attributes can coincide for unrelated listings,
+whereas comparing SNB against total area or treating garden classifications as
+incompatible also creates unnecessary missed matches.
+
+**How to apply:** use explicit source text, preserve absent information, and
+keep equal-strength candidates unconfirmed rather than choosing by order.

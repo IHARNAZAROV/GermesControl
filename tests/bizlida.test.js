@@ -6,9 +6,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const XLSX = require('xlsx');
-const { parseBizlidaXlsx, finalizeRecord } = require('../src/main/parsers');
+const { parseBizlidaXlsx, parseKufarXml, finalizeRecord } = require('../src/main/parsers');
 const { runComparison } = require('../src/main/compare');
 const { buildWorkbook } = require('../src/main/reports');
+const { propertyFeatures, extractBizlidaLocation } = require('../src/main/bizlida');
 
 function row(id, title, description = '', price = '120 000') {
     return ['https://bizlida.by/photo.jpeg', 'АН ГермесГарант',
@@ -254,4 +255,158 @@ test('Excel reports expose Bizlida presence and compared values', () => {
     const { workbook: diffs } = buildWorkbook('diffs', report);
     const values = XLSX.utils.sheet_to_json(diffs.Sheets['Данные'], { range: 3 });
     assert.equal(values[0]['Значение — Bizlida'], 135000);
+});
+
+test('Bizlida refines the title street from the description without taking a nearby street', async (t) => {
+    const records = await parseRows([
+        row(1, 'Квартира ул. Машерова', 'Адрес: ул. Машерова, 23 корп.1. Рядом ул. Победы, 100.'),
+        row(2, 'Квартира ул. Машерова', 'Рядом ул. Победы, 100.'),
+        row(3, 'Дом под реконструкцию д.Горни', 'Просторное помещение к перепланировке.'),
+        row(4, 'Квартира', 'Адрес офиса: г. Лида, ул. Победы, 100.')
+    ], t);
+    assert.equal(records[0].address, 'Машерова, 23, корпус 1');
+    assert.equal(records[1].address, 'Машерова');
+    assert.equal(records[2].address, null);
+    assert.equal(records[3].address, null);
+});
+
+test('Bizlida parses numeric street names, full street words, house letters, and dotted corps', async (t) => {
+    const records = await parseRows([
+        row(1, 'Квартира на улице 7 ноября, д.8 к.2'),
+        row(2, 'Дом на улице Аэродромной, 19В'),
+        row(3, 'Дом ул. 40 лет Победы, 12'),
+        row(4, 'Дом г.п.Вороново', 'Дом в г.п.Вороново Этот дом продаётся.'),
+        row(5, 'Дом д. Красная Слобода'),
+        row(6, 'Дом в деревне Кривичи Ивьевского района')
+    ], t);
+    assert.equal(records[0].address, '7 ноября, 8, корпус 2');
+    assert.equal(records[1].address, 'Аэродромной, 19В');
+    assert.equal(records[2].address, '40 лет Победы, 12');
+    assert.equal(records[3].city, 'Вороново');
+    assert.equal(records[4].city, 'Красная Слобода');
+    assert.equal(records[5].city, 'Кривичи');
+});
+
+test('Bizlida finds the property village after a distance reference and never defaults to Lida', () => {
+    assert.equal(extractBizlidaLocation('Дом в 7 км от города Лида (д. Нетечь).', '').city, 'Нетечь');
+    assert.equal(extractBizlidaLocation('Строение в 12 км от центра города Лида', '').city, null);
+    assert.equal(extractBizlidaLocation('ДАЧА СТ Зорька, 15 мин от г.Лида', '').city, null);
+});
+
+test('Bizlida keeps total area separate from SNB and reads truncated areas and title floors', async (t) => {
+    const records = await parseRows([
+        row(1, 'Двухэтажный дом', 'Общая площадь 62,1 …'),
+        row(2, '3-комнатная квартира', 'Общая площадь по СНБ -82.3 кв.м.'),
+        row(3, '4к квартира', 'Общая площадь по СНБ 85м3, жилая площадь -53.6м3'),
+        row(4, '2к квартира', 'Общая площадь 57.2 м3.'),
+        row(5, 'Квартира', 'Общая площадь 79,6 м2, площадь по СНБ 82,9 м2.')
+    ], t);
+    assert.equal(records[0].totalArea, 62.1);
+    assert.equal(records[0].floors, 2);
+    assert.equal(records[1].totalArea, null);
+    assert.equal(propertyFeatures(records[1]).snb, 82.3);
+    assert.equal(records[2].totalArea, null);
+    assert.equal(records[3].totalArea, 57.2);
+    assert.equal(records[4].totalArea, 79.6);
+});
+
+test('locationless price, type, and rooms alone never match even a sole candidate', () => {
+    const report = compare({ site: [], kufar: [],
+        bizlida: [rec('bizlida', { city: null, address: null, totalArea: null, title: 'Квартира в центре' })] });
+    assert.equal(report.objects.length, 2);
+    assert.equal(report.categories.missingBizlida, 1);
+});
+
+test('same town, price, type, and rooms without dimensions are not sufficient either', () => {
+    const report = compare({ site: [], kufar: [],
+        bizlida: [rec('bizlida', { address: null, totalArea: null, title: 'Квартира в центре' })] });
+    assert.equal(report.objects.length, 2);
+});
+
+test('village and street-only listings match using plot area, floors, or construction year', async (t) => {
+    for (const [title, description, counterpart] of [
+        ['Жилой дом д.Татарцы', 'На участке в 25 соток.', { city: 'д. Татарцы', address: 'д. Татарцы, 6', description: 'Участок площадью 25 соток.' }],
+        ['Полдома на улице Тургенева', 'На участке площадью 6 соток.', { address: 'ул. Тургенева', description: 'Участок площадью 6 соток.' }],
+        ['Двухэтажный дом на ул. Зелёная (Новосёлки)', '', { city: 'Лидский район', address: 'ул. Зеленая, 6, д. Новосёлки', floors: 2 }],
+        ['Евродвушка в новом доме, 2026гп', 'Новостройка в районе ул.Тухачевского', { address: 'ул. Тухачевского, 49А', description: 'Дом построен в 2026 году.', type: 'Квартира', rooms: 1 }]
+    ]) {
+        const [biz] = await parseRows([row(1, title, description)], t);
+        const report = compare({ site: [rec('site', { type: 'Дом', ...counterpart })], ilvo: [], kufar: [], bizlida: [biz] });
+        assert.equal(report.objects.length, 1, title);
+    }
+});
+
+test('a garden house classified as House on the site matches Dacha with garden and plot evidence', async (t) => {
+    const [biz] = await parseRows([row(1, 'ДАЧА СТ Зорька', 'Участок 10 соток, домик 2023 гп')], t);
+    const report = compare({ site: [rec('site', {
+        type: 'Дом', address: 'СТ «Зорька», участок 56', title: 'Дача в СТ «Зорька»',
+        description: 'Участок площадью 10 соток, дом построен в 2023 году.'
+    })], ilvo: [], kufar: [], bizlida: [biz] });
+    assert.equal(report.objects.length, 1);
+});
+
+test('locationless listings require multiple specific details and reject their contradictions', async (t) => {
+    const [biz] = await parseRows([row(1, 'Незавершенное строение 2024 года постройки в 12 км от центра города Лида')], t);
+    for (const [year, distance, expected] of [[2024, 12, 1], [2023, 12, 2], [2024, 20, 2]]) {
+        const report = compare({ site: [rec('site', { type: 'Дом',
+            description: `Дом построен в ${year} году, в ${distance} км от Лиды.` })],
+        ilvo: [], kufar: [], bizlida: [biz] });
+        assert.equal(report.objects.length, expected);
+    }
+});
+
+test('matching SNB uses SNB on the other side, not its smaller total area', async (t) => {
+    const [biz] = await parseRows([row(1, '3-комнатная квартира', 'Общая площадь по СНБ -82.3 кв.м.')], t);
+    const report = compare({ site: [rec('site', { totalArea: 79.6, description: 'Общая площадь 79,6 м2, по СНБ 82,9 м2.' })],
+        ilvo: [], kufar: [], bizlida: [biz] });
+    assert.equal(report.objects.length, 1);
+    assert.ok(!report.objects[0].fieldDiffs.some((diff) => diff.field === 'totalArea'));
+});
+
+test('contradictory plot/year evidence and equal-strength candidates stay separate', async (t) => {
+    const [biz] = await parseRows([row(1, 'Дом д.Татарцы', 'Участок 25 соток.')], t);
+    const base = { type: 'Дом', city: 'д. Татарцы', address: 'д. Татарцы, 6', description: 'Участок 15 соток.' };
+    let report = compare({ site: [rec('site', base)], ilvo: [], kufar: [], bizlida: [biz] });
+    assert.equal(report.objects.length, 2);
+    report = compare({ site: [
+        rec('site', { ...base, id: 'a', description: 'Участок 25 соток.', contractNumber: '1/1' }),
+        rec('site', { ...base, id: 'b', address: 'д. Татарцы, 7', description: 'Участок 25 соток.', contractNumber: '2/1' })
+    ], ilvo: [], kufar: [], bizlida: [biz] });
+    assert.equal(report.objects.length, 3);
+    assert.equal(report.categories.onlyBizlida, 1);
+});
+
+test('saved Bizlida imports are reparsed from original texts before comparison without editing them', async (t) => {
+    const [biz] = await parseRows([row(1, '3-к квартира ул. Машерова', 'ул. Машерова, 23 корп.1. Общая площадь 62,1 …')], t);
+    const old = { ...biz, address: 'Машерова', totalArea: null };
+    const report = compare({ site: [], kufar: [], bizlida: [old] });
+    assert.equal(report.objects.length, 1);
+    assert.equal(old.address, 'Машерова');
+    assert.equal(old.totalArea, null);
+});
+
+test('rounded plot sizes do not hide a village listing with corroborating total area', async (t) => {
+    const [biz] = await parseRows([row(1, 'Дом д.Горни', 'Общая площадь 71 м2. Участок 10 соток.')], t);
+    const report = compare({ site: [rec('site', {
+        type: 'Дом', city: 'Лидский район', address: 'ул. Полевая, 1А, д. Горни',
+        totalArea: 71.2, description: 'Участок площадью 10,7 сотки.'
+    })], ilvo: [], kufar: [], bizlida: [biz] });
+    assert.equal(report.objects.length, 1);
+});
+
+test('a Kufar house with land is not misclassified as land and does not block the Bizlida group', async (t) => {
+    const records = await parseKufarXml(`<uedb><records>
+        <record><unid>house</unid><category>1020</category><subject>Дом с участком в СТ Лесное</subject><price>120000</price><size>120</size></record>
+        <record><unid>plot</unid><category>1020</category><subject>Земельный участок под строительство жилого дома</subject></record>
+        </records></uedb>`, true);
+    assert.equal(records[0].type, 'Дом');
+    assert.equal(records[1].type, 'Участок');
+    const [biz] = await parseRows([row(1, 'Дом с участком в СТ Лесное', 'Общая площадь 120 м2.')], t);
+    const report = compare({
+        site: [rec('site', { contractNumber: null, type: 'Дом', address: 'ул. Лесная, СТ «Лесное»', totalArea: 120 })],
+        ilvo: [], kufar: [{ ...records[0], type: 'Участок' }], bizlida: [biz]
+    });
+    assert.equal(report.objects.length, 1);
+    assert.equal(report.objects[0].presence.bizlida, true);
+    assert.equal(report.objects[0].presence.kufar, true);
 });

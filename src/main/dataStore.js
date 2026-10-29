@@ -6,6 +6,7 @@ const dayjs = require('dayjs');
 const { app } = require('electron');
 const Store = require('electron-store');
 const { buildSampleDataset } = require('./sampleData');
+const { refreshBizlidaRecord, refreshKufarRecord } = require('./parsers');
 
 // The project data directory is writable during development, but files inside
 // app.asar are read-only in a packaged build. Keep user data outside the
@@ -107,6 +108,8 @@ function getState() {
     try {
         const state = fs.readJsonSync(STATE_FILE);
         state.sources.bizlida ||= { data: [], meta: defaultMeta() };
+        state.sources.bizlida.data = state.sources.bizlida.data.map(refreshBizlidaRecord);
+        if (state.sources.kufar) state.sources.kufar.data = state.sources.kufar.data.map(refreshKufarRecord);
         stateCache = state;
         pruneAllUploadedFiles(state);
         return state;

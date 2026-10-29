@@ -13,6 +13,7 @@ const {
 
 const NUMERIC_KEYS = new Set(OBJECT_FIELDS.filter((f) => f.numeric).map((f) => f.key));
 const SITE_BASE_URL = 'https://germesgarant.by';
+const { propertyDescription, extractBizlidaLocation } = require('./bizlida');
 
 function toNumberOrNull(v) {
     if (v === undefined || v === null || v === '') return null;
@@ -363,8 +364,17 @@ const KUFAR_CATEGORY_TYPE = { 1010: 'Квартира', 1020: 'Дом', 1050: '�
 
 function kufarTypeFromCategory(category, subject) {
     const cat = Number(category);
-    if (cat === 1020 && /участ/i.test(subject || '')) return 'Участок';
+    // «Дом с участком» — дом, а не земельный участок. Общая категория
+    // Kufar включает оба типа, поэтому уточняем только явный заголовок.
+    if (cat === 1020 && /^(?:прода[её]тся\s+|продажа\s+)?(?:земельн[а-яё]*\s+)?участ/iu.test(subject || '')) return 'Участок';
     return KUFAR_CATEGORY_TYPE[cat] || 'Другое';
+}
+
+function refreshKufarRecord(record) {
+    if (record?.type === 'Участок' && /^(?:прода[её]тся\s+|продажа\s+)?дом\s+с\s+участ/iu.test(record.title || '')) {
+        return { ...record, type: 'Дом' };
+    }
+    return record;
 }
 
 /**
@@ -485,33 +495,38 @@ async function parseKufarXml(filePathOrContent, isRawContent) {
 
 // Экспорт Bizlida — семь колонок БЕЗ заголовка. Не используем
 // sheet_to_json с заголовком по умолчанию: иначе теряется первое объявление.
-function extractBizlidaLocation(title, description) {
-    // Рекламная подпись содержит адрес агентства, а не объекта.
-    const safeDescription = String(description || '').split(
-        /(?:лицензия|работаем со всеми|консультаци[а-яё]*\s+по|обращайтесь|наш\s+офис|адрес\s+офиса)/iu
-    )[0];
-    const text = `${title || ''}. ${safeDescription}`;
-    const locality = text.match(
-        /(?:^|[\s,(])(?:д\.|деревн[а-яё]*\s+|аг\.|агрогород[а-яё]*\s+|г\.|городе\s+|(?:городском\s+)?пос[её]л[а-яё]*\s+)\s*([А-ЯЁ][А-Яа-яЁё]*(?:-[А-Яа-яЁё0-9]+)*)/u
+function bizlidaProperties(title, description) {
+    const safeDescription = propertyDescription(description);
+    const text = `${title || ''} ${safeDescription}`;
+    const type = /участок\s+под|земельн[а-яё]*\s+участ/iu.test(title) ? 'Участок'
+        : /квартир|евродвуш|комнатная\s+Чешка/iu.test(title) ? 'Квартира'
+        : /дача|дачн/iu.test(title) ? 'Дача'
+        : /дом|коттедж|незаверш[а-яё]*\s+строен/iu.test(title) ? 'Дом' : null;
+    const withoutSnb = safeDescription.replace(
+        /(?:общ[а-яё]*\s+)?площад[а-яё]*\s+(?:квартиры\s+)?по\s+СНБ[^0-9]{0,25}\d+(?:[.,]\d+)?(?:\s*(?:кв\.?\s*)?м[²23]?)?/giu, ''
     );
-    // «от г. Лида», «10 мин от ...» — ориентир, а не населённый пункт.
-    let city = locality && !/(?:от|до)\s*$/iu.test(text.slice(Math.max(0, locality.index - 5), locality.index).trim())
-        ? locality[1] : null;
-    if (city === 'Лиде' || city === 'Лиды') city = 'Лида';
-    if (!city) city = String(title || '').match(/(?:^|\s)в\s+(Вороново)(?=$|[\s,.])/u)?.[1] || null;
-    // В этой выгрузке Новосёлки указаны в скобках после улицы.
-    if (!city) city = String(title || '').match(/\((Новос[её]лки)\)/u)?.[1] || null;
-    const street = text.match(
-        /(?:^|[\s,(])(?:ул\.?|улиц[а-яё]*|пр-т\.?|проспект[а-яё]*|пер\.?|переул[а-яё]*|б-р\.?|бульвар[а-яё]*)\s*([А-ЯЁA-Z](?:\.\s*)?[А-Яа-яЁёA-Za-z-]*(?:\s+[А-ЯЁ][А-Яа-яЁё-]*){0,3})(?:\s*,?\s*(?:д\.\s*)?(\d+[а-яa-z]?(?:\/\d+)?)(?:\s*(?:корп(?:ус)?\.?|к|[-–—])\s*(\d+[а-яa-z]?))?)?/u
-    );
-    const garden = text.match(/(?:^|\s)СТ\s+[«"]?([А-ЯЁ][А-Яа-яЁё-]*)/u);
-    const shortStreet = String(title || '').match(/квартир[а-яё]*\s+на\s+([А-ЯЁ][А-Яа-яЁё-]*ского)(?=$|[\s,.])/u);
     return {
-        city,
-        address: street
-            ? [street[1].trim(), street[2], street[3] ? `корпус ${street[3]}` : null].filter(Boolean).join(', ')
-            : garden ? `СТ ${garden[1]}` : shortStreet ? shortStreet[1] : null
+        type,
+        ...extractBizlidaLocation(title, description),
+        rooms: extractNumberNear(text, /(\d+)\s*[-]?\s*(?:х\s*)?(?:комн[а-яё.]*|к)(?=$|[^а-яё])/iu)
+            || (/однокомнат/iu.test(text) ? 1 : /двухкомнат/iu.test(text) ? 2
+                : /тр[её]хкомнат/iu.test(text) ? 3 : /четыр[её]хкомнат/iu.test(text) ? 4 : null),
+        // Единицы могли не попасть в обрезанное «Общая площадь 62,1 …».
+        // СНБ в эту величину не включаем.
+        totalArea: extractNumberNear(withoutSnb,
+            /общ[а-яё]*\s+(?:площад[а-яё]*|пл\.)[^0-9]{0,35}(\d+(?:[.,]\d+)?)/iu),
+        floor: extractFloorFromText(safeDescription),
+        floors: extractFloorsFromText(text)
     };
+}
+
+function refreshBizlidaRecord(record) {
+    // У старых импортов сохранены оригинальные тексты: повторно выбирать
+    // XLSX не нужно. Не переинтерпретируем сторонние структурированные записи.
+    if (!record?.listingUrl?.includes('bizlida.by/baraholka/')) return record;
+    const refreshed = { ...record, ...bizlidaProperties(record.title, record.description) };
+    refreshed.addressKey = normalizeAddressKey(refreshed.city, refreshed.address);
+    return refreshed;
 }
 
 async function parseBizlidaXlsx(filePath) {
@@ -528,21 +543,11 @@ async function parseBizlidaXlsx(filePath) {
             }
             const title = cleanString(row[3]);
             const description = cleanString(row[4]);
-            const text = `${title} ${description || ''}`;
-            const type = /участок\s+под|земельн[а-яё]*\s+участ/iu.test(title) ? 'Участок'
-                : /квартир|евродвуш|комнатная\s+Чешка/iu.test(title) ? 'Квартира'
-                : /дача|дачн/iu.test(title) ? 'Дача'
-                : /дом|коттедж/iu.test(title) ? 'Дом' : null;
             const rec = finalizeRecord({
                 id: String(row[2]).match(/baraholka\/(\d+)/u)[1],
-                title, description, type,
-                ...extractBizlidaLocation(title, description),
+                title, description,
+                ...bizlidaProperties(title, description),
                 price: row[5], priceUsd: null,
-                rooms: extractNumberNear(title, /(\d+)\s*[-]?\s*(?:х\s*)?(?:комн[а-яё.]*|к)(?=$|[^а-яё])/iu)
-                    || (/тр[её]хкомнат/iu.test(text) ? 3 : /двухкомнат/iu.test(text) ? 2 : null),
-                totalArea: extractTotalAreaFromText(description),
-                floor: extractFloorFromText(description),
-                floors: extractFloorsFromText(description),
                 contractNumber: null, status: 'active', photos: row[0]
             }, 'bizlida', `bizlida-${records.length + 1}`);
             rec.listingUrl = String(row[2]).trim();
@@ -559,6 +564,8 @@ module.exports = {
     parseSiteJsonContent,
     parseIlvoXlsx,
     parseBizlidaXlsx,
+    refreshBizlidaRecord,
+    refreshKufarRecord,
     parseKufarXml,
     finalizeRecord
 };

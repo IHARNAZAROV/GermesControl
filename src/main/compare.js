@@ -1,6 +1,8 @@
 'use strict';
 
 const dayjs = require('dayjs');
+const { compatiblePropertyType, additionalEvidence } = require('./bizlida');
+const { refreshBizlidaRecord, refreshKufarRecord } = require('./parsers');
 const {
     OBJECT_FIELDS,
     ERROR_TYPES,
@@ -13,7 +15,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 13;
+const REPORT_MATCHING_VERSION = 14;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -382,12 +384,36 @@ function conflictingBizlidaCharacteristics(a, b) {
     for (const key of ['type', 'dealType', 'rooms', 'totalArea', 'livingArea', 'kitchenArea', 'floor', 'floors']) {
         if (!hasRecordValue(a[key]) || !hasRecordValue(b[key])) continue;
         if (['type', 'dealType'].includes(key)) {
-            if (normalizedComparableText(a[key]) !== normalizedComparableText(b[key])) return true;
+            if (key === 'type' ? !compatiblePropertyType(a, b)
+                : normalizedComparableText(a[key]) !== normalizedComparableText(b[key])) return true;
         } else if (!numericValuesMatch(a[key], b[key], key.endsWith('Area') ? 0.01 : 0)) {
             return true;
         }
     }
-    return false;
+    return additionalEvidence(a, b).conflicts.some((key) => key !== 'snb');
+}
+
+function bizlidaDescriptorEvidence(a, b, locationMatch, streetMatch) {
+    if (!pricesMatch(a, b) || !compatiblePropertyType(a, b)) return false;
+    const evidence = additionalEvidence(a, b);
+    if (evidence.conflicts.length) return false;
+    const area = hasRecordValue(a.totalArea) && hasRecordValue(b.totalArea)
+        && numericValuesMatch(a.totalArea, b.totalArea);
+    const rooms = hasRecordValue(a.rooms) && hasRecordValue(b.rooms)
+        && numericValuesMatch(a.rooms, b.rooms, 0);
+    const floors = hasRecordValue(a.floors) && hasRecordValue(b.floors)
+        && numericValuesMatch(a.floors, b.floors, 0);
+    if (locationMatch) {
+        // Улица/деревня с подтверждающей характеристикой. Тип сам по себе
+        // не считается характеристикой, год/участок/этажность — считаются.
+        return (streetMatch && (rooms || floors)) || area || evidence.matches.length > 0;
+    }
+    // Без местоположения квартира с той же ценой и комнатами может быть
+    // совершенно другой. Нужна площадь, СНБ либо несколько особых признаков.
+    return (area && (rooms || (!!a.type && !!b.type)))
+        || evidence.matches.includes('snb') && rooms
+        || evidence.matches.includes('project') && rooms
+        || evidence.matches.filter((key) => ['year', 'plot', 'distance'].includes(key)).length >= 2;
 }
 
 /**
@@ -421,7 +447,7 @@ function buildMatchGroups(bySource) {
         for (const existing of Object.values(group.records)) {
             if (!existing) continue;
             const isBizlida = rec.source === 'bizlida' || existing.source === 'bizlida';
-            if (isBizlida && rec.city && existing.city && !bizlidaCityMatches(rec, existing)) continue;
+            if (isBizlida && rec.city && (existing.city || existing.address) && !bizlidaCityMatches(rec, existing)) continue;
             const existingContractKey = recordContractKey(existing);
             const contractMatch = !!(recContractKey && existingContractKey && recContractKey === existingContractKey);
             let addressMatch = addressMatches(rec, existing);
@@ -429,7 +455,10 @@ function buildMatchGroups(bySource) {
             // Улица без дома не идентифицирует объявление. Для Bizlida
             // требуем цену и ещё один параметр либо точный заголовок.
             const specificAddress = hasSpecificHouseAddress(rec) && hasSpecificHouseAddress(existing) && addressMatch;
-            const descriptorEvidence = descriptorMatches(rec, existing);
+            const locationMatch = addressMatch || !!(rec.city && bizlidaCityMatches(rec, existing));
+            const descriptorEvidence = isBizlida
+                ? bizlidaDescriptorEvidence(rec, existing, locationMatch, addressMatch)
+                : descriptorMatches(rec, existing);
             const titleMatch = isBizlida && (specificAddress || descriptorEvidence)
                 && normalizedComparableText(rec.title).length > 15
                 && normalizedComparableText(rec.title) === normalizedComparableText(existing.title);
@@ -539,8 +568,8 @@ function runComparison({ site, ilvo, kufar, bizlida, contracts = [], includeCont
     const sources = {
         site: collapseSourceDuplicates(site),
         ilvo: collapseSourceDuplicates(ilvo),
-        kufar: collapseSourceDuplicates(kufar),
-        bizlida: collapseSourceDuplicates(bizlida)
+        kufar: collapseSourceDuplicates((kufar || []).map(refreshKufarRecord)),
+        bizlida: collapseSourceDuplicates((bizlida || []).map(refreshBizlidaRecord))
     };
     const groups = buildMatchGroups(sources);
 
