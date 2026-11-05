@@ -16,23 +16,31 @@ function row(id, title, description = '', price = '120 000') {
         `https://bizlida.by/baraholka/${id}`, title, description, price, '28 октября, 18:09'];
 }
 
-async function parseRows(rows, context) {
+async function parseSheets(sheets, context) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bizlida-'));
     context.after(() => fs.rmSync(dir, { recursive: true, force: true }));
     const file = path.join(dir, 'export.xlsx');
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Объявления');
+    sheets.forEach((rows, index) => {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), `Объявления ${index + 1}`);
+    });
     XLSX.writeFile(wb, file);
     return parseBizlidaXlsx(file);
 }
 
+async function parseRows(rows, context) {
+    return parseSheets([rows], context);
+}
+
 function rec(source, extra = {}) {
-    return finalizeRecord({
+    const record = finalizeRecord({
         id: `${source}-1`, title: '3-к квартира по ул. Машерова,23 корп.1',
         type: 'Квартира', city: 'Лида', address: 'ул. Машерова, 23к1',
         rooms: 3, price: 120000, totalArea: 62.1,
         contractNumber: source === 'bizlida' ? null : '11/1', status: 'active', ...extra
     }, source, `${source}-1`);
+    if (extra.matchingContractKey) record.matchingContractKey = extra.matchingContractKey;
+    return record;
 }
 
 function compare(extra = {}) {
@@ -58,6 +66,61 @@ test('Bizlida keeps the first headerless row, BYN prices, URL, photo, and all se
     assert.deepEqual(records[0].photos, ['https://bizlida.by/photo.jpeg']);
     assert.equal(records[1].address, 'Победы, 19');
     assert.equal(records[1].rooms, 1);
+});
+
+test('Bizlida imports the detailed six-column export and deduplicates repeated sheets', async (t) => {
+    const row = [
+        'https://bizlida.by/baraholka/136143',
+        'ПРОДАМ\n:\n Дом мансардного типа на улице Доватора',
+        '132 000 ',
+        'Дом расположен на улице Доватора. Общая площадь 77,7 кв.м.',
+        'АН ГермесГарант\nНа сайте с 2026 года · все объявления',
+        'Полное описание объекта. Консультации по покупке, продаже, обмену недвижимости '
+            + 'обращайтесь по адресу: г. Лида, б-р. Князя Гедимина 12. '
+            + 'Договор №79/1 от 04.09.2026 г.'
+    ];
+    const ambiguousContractRow = [
+        'https://bizlida.by/baraholka/136145',
+        'ПРОДАМ : Дом',
+        '75 800',
+        'Дом на улице Комсомольской',
+        'АН ГермесГарант',
+        'Описание. Договор 24/1 от 09.07.2026 г. Договор 25/1 от 10.07.2026 г.'
+    ];
+    const sheet = [
+        ['headline href', 'page-title', 'currency-format', 'record__lead', 'record-author', 'record-text'],
+        row,
+        ambiguousContractRow
+    ];
+    const records = await parseSheets([sheet, sheet], t);
+    assert.equal(records.length, 2);
+    assert.equal(records[0].id, '136143');
+    assert.equal(records[0].title, 'Дом мансардного типа на улице Доватора');
+    assert.equal(records[0].price, 132000);
+    assert.equal(records[0].address, 'Доватора');
+    assert.equal(records[0].matchingContractKey, '79/1');
+    assert.equal(records[0].contractNumber, null);
+    assert.equal(records[0].contractKey, null);
+    assert.deepEqual(records[0].photos, []);
+    assert.equal(records[0].publishedText, null);
+    assert.match(records[0].description, /Общая площадь 77,7/u);
+    assert.match(records[0].description, /Договор №79\/1/u);
+    assert.equal(records[1].matchingContractKey, null);
+});
+
+test('Bizlida still imports the previous headered six-column export', async (t) => {
+    const records = await parseRows([
+        ['item__image src', 'seller', 'headline href', 'headline', 'summary', 'currency-format'],
+        ['https://bizlida.by/photo.jpeg', 'АН ГермесГарант',
+            'https://bizlida.by/baraholka/135590',
+            'Продаётся 3-к квартир по ул. Машерова,23 корп.1',
+            'Общая площадь 62,1 м2.', '120 000']
+    ], t);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].id, '135590');
+    assert.equal(records[0].address, 'Машерова, 23, корпус 1');
+    assert.equal(records[0].price, 120000);
+    assert.deepEqual(records[0].photos, ['https://bizlida.by/photo.jpeg']);
 });
 
 test('Bizlida splits villages, house/corpus formats, initials, and ignores the office signature', async (t) => {
@@ -123,6 +186,67 @@ test('Bizlida-only listings are included everywhere except contract validation a
     assert.equal(report.categories.missingSite, 1);
     assert.equal(report.categories.missingIlvo, 1);
     assert.equal(report.categories.missingKufar, 1);
+});
+
+test('Bizlida contract is a fallback match key, not a contract-compliance value', async (t) => {
+    const [bizlida] = await parseRows([
+        ['headline href', 'page-title', 'currency-format', 'record__lead', 'record-author', 'record-text'],
+        ['https://bizlida.by/baraholka/136145', 'ПРОДАМ : 3-комнатная квартира', '120 000',
+            'Продается квартира без адреса.', 'АН ГермесГарант',
+            'Описание без адреса. Договор №79/1 от 04.09.2026 г.']
+    ], t);
+    const report = compare({
+        site: [rec('site', {
+            id: 'site-contract', contractNumber: '79/1', city: null, address: null,
+            title: '3-комнатная квартира'
+        })],
+        ilvo: [], kufar: [],
+        bizlida: [bizlida]
+    });
+    assert.equal(report.objects.length, 1);
+    assert.equal(report.objects[0].matchedBy, 'contract');
+    assert.equal(report.objects[0].presence.bizlida, true);
+    assert.equal(report.objects[0].contractNumber, '79/1');
+
+    const bizlidaOnly = compare({
+        site: [], ilvo: [], kufar: [],
+        bizlida: [bizlida]
+    });
+    assert.equal(bizlidaOnly.objects[0].contractNumber, null);
+    assert.equal(bizlidaOnly.contracts.length, 0);
+    assert.equal(bizlidaOnly.stats.withoutContract, 0);
+    assert.ok(!bizlidaOnly.errors.some((error) => /договор/iu.test(error.type)));
+});
+
+test('Bizlida contract does not override conflicting complete addresses', () => {
+    const report = compare({
+        site: [rec('site', {
+            id: 'site-address', contractNumber: '79/1',
+            address: 'ул. Машерова, 23', rooms: 3
+        })],
+        ilvo: [], kufar: [],
+        bizlida: [rec('bizlida', {
+            id: 'bizlida-other-address', matchingContractKey: '79/1',
+            address: 'ул. Кирова, 10', rooms: 3
+        })]
+    });
+    assert.equal(report.objects.length, 2);
+    assert.equal(report.categories.onlyBizlida, 1);
+});
+
+test('Bizlida house and corpus numbers must agree before address matching', () => {
+    for (const [sourceAddress, bizlidaAddress] of [
+        ['Фурманова, 60', 'Фурманова, 60 корпус 2'],
+        ['Фурманова, 60 корпус 1', 'Фурманова, 60 корпус 2']
+    ]) {
+        const report = compare({
+            site: [rec('site', { contractNumber: null, address: sourceAddress })],
+            ilvo: [], kufar: [],
+            bizlida: [rec('bizlida', { address: bizlidaAddress })]
+        });
+        assert.equal(report.objects.length, 2);
+        assert.equal(report.categories.onlyBizlida, 1);
+    }
 });
 
 test('Bizlida prices use ILVO as reference, not the website or Kufar', () => {

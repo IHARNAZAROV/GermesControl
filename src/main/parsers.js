@@ -520,6 +520,19 @@ function bizlidaProperties(title, description) {
     };
 }
 
+function cleanBizlidaTitle(value) {
+    return cleanString(value)?.replace(/^\s*продам\s*:?\s*/iu, '').trim() || null;
+}
+
+function extractBizlidaMatchingContractKey(description) {
+    const matches = [...String(description || '').replace(/\u00a0/g, ' ').matchAll(
+        /(?:^|[^0-9A-Za-zА-Яа-яЁё])договор(?:а|у|ом|е)?\s*(?:(?:№|#|n[oо]?\.?)\s*)?(\d+\s*[/-]\s*[0-9A-Za-zА-Яа-яЁё]+|\d+[A-Za-zА-Яа-яЁё]*)(?=$|[^0-9A-Za-zА-Яа-яЁё])/giu
+    )].map((match) => extractContractKey(match[0])).filter(Boolean);
+    const uniqueKeys = [...new Set(matches)];
+    // Если в тексте явно указаны разные договоры, не выбираем один наугад.
+    return uniqueKeys.length === 1 ? uniqueKeys[0] : null;
+}
+
 function refreshBizlidaRecord(record) {
     // У старых импортов сохранены оригинальные тексты: повторно выбирать
     // XLSX не нужно. Не переинтерпретируем сторонние структурированные записи.
@@ -532,26 +545,97 @@ function refreshBizlidaRecord(record) {
 async function parseBizlidaXlsx(filePath) {
     const wb = XLSX.readFile(filePath);
     const records = [];
+    const recordIndexesByUrl = new Map();
+
+    function headerSchema(row) {
+        const cells = row.map((value) => String(value || '').trim().toLowerCase());
+        const isNewFormat = cells[0] === 'headline href'
+            || (cells[0] === 'headline href' && cells[1] === 'page-title')
+            || (cells.includes('page-title') && cells.includes('record-text'));
+        if (isNewFormat) {
+            return {
+                url: 0, title: 1, price: 2, lead: 3, description: 5,
+                photos: null, published: null, format: 'new'
+            };
+        }
+
+        const legacyUrlIndex = cells.findIndex((value) => (
+            /^(?:headline href|ссылка|url|ссылка на объявление)$/iu.test(value)
+        ));
+        if (legacyUrlIndex >= 0 || cells.some((value) => /^(?:item__image src|фото)$/iu.test(value))) {
+            return {
+                url: 2, title: 3, price: 5, lead: null, description: 4,
+                photos: 0, published: 6, format: 'legacy'
+            };
+        }
+        return null;
+    }
+
+    function inferredSchema(row) {
+        const isUrl = (value) => /^https?:\/\/(?:www\.)?bizlida\.by\/baraholka\/\d+\/?(?:[?#].*)?$/iu
+            .test(String(value || '').trim());
+        if (isUrl(row[0])) {
+            return { url: 0, title: 1, price: 2, lead: 3, description: 5, photos: null, published: null, format: 'new' };
+        }
+        if (isUrl(row[2])) {
+            return { url: 2, title: 3, price: 5, lead: null, description: 4, photos: 0, published: 6, format: 'legacy' };
+        }
+        return null;
+    }
+
     for (const name of wb.SheetNames) {
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null });
-        for (const row of rows) {
+        let schema = null;
+        for (const [rowIndex, row] of rows.entries()) {
             if (row.every((value) => value === null || String(value).trim() === '')) continue;
-            // Разрешаем явную строку заголовков, но не пропускаем повреждённые данные.
-            if (/^(?:ссылка|url|ссылка на объявление)$/iu.test(String(row[2] || '').trim())) continue;
-            if (!/^https?:\/\/(?:www\.)?bizlida\.by\/baraholka\/\d+\/?(?:[?#].*)?$/iu.test(String(row[2] || '').trim()) || !row[3]) {
-                throw new Error(`Bizlida: неверный формат строки ${rows.indexOf(row) + 1} листа «${name}». Ожидаются 7 колонок: фото, агентство, ссылка, заголовок, описание, цена, дата.`);
+            const detectedHeader = headerSchema(row);
+            if (detectedHeader) {
+                schema = detectedHeader;
+                continue;
             }
-            const title = cleanString(row[3]);
-            const description = cleanString(row[4]);
+
+            const columns = schema || inferredSchema(row);
+            const listingUrl = cleanString(row[columns?.url]);
+            const rawTitle = cleanString(row[columns?.title]);
+            if (!columns
+                || !/^https?:\/\/(?:www\.)?bizlida\.by\/baraholka\/\d+\/?(?:[?#].*)?$/iu.test(listingUrl || '')
+                || !rawTitle) {
+                throw new Error(`Bizlida: неверный формат строки ${rowIndex + 1} листа «${name}». Поддерживаются новая выгрузка с URL/заголовком/ценой/описаниями и прежняя выгрузка с фото/агентством/URL/заголовком/описанием/ценой.`);
+            }
+
+            const title = cleanBizlidaTitle(rawTitle);
+            const lead = columns.lead === null ? null : cleanString(row[columns.lead]);
+            const fullDescription = cleanString(row[columns.description]);
+            const description = [lead, fullDescription].filter(Boolean).join('\n\n') || null;
+            const matchingContractKey = extractBizlidaMatchingContractKey(fullDescription || description);
             const rec = finalizeRecord({
-                id: String(row[2]).match(/baraholka\/(\d+)/u)[1],
+                id: listingUrl.match(/baraholka\/(\d+)/u)[1],
                 title, description,
                 ...bizlidaProperties(title, description),
-                price: row[5], priceUsd: null,
-                contractNumber: null, status: 'active', photos: row[0]
+                price: row[columns.price], priceUsd: null,
+                contractNumber: null, status: 'active',
+                photos: columns.photos === null ? null : row[columns.photos]
             }, 'bizlida', `bizlida-${records.length + 1}`);
-            rec.listingUrl = String(row[2]).trim();
-            rec.publishedText = cleanString(row[6]);
+            rec.listingUrl = listingUrl;
+            rec.publishedText = columns.published === null ? null : cleanString(row[columns.published]);
+            rec.matchingContractKey = matchingContractKey;
+
+            const previousIndex = recordIndexesByUrl.get(rec.listingUrl);
+            if (previousIndex !== undefined) {
+                const previous = records[previousIndex];
+                // Некоторые выгрузки содержат один и тот же набор на нескольких листах.
+                // Сохраняем более полный вариант записи, но не импортируем его повторно.
+                const previousScore = Number(!!previous.matchingContractKey) * 1000
+                    + Number(!!previous.address) * 100
+                    + String(previous.description || '').length;
+                const currentScore = Number(!!rec.matchingContractKey) * 1000
+                    + Number(!!rec.address) * 100
+                    + String(rec.description || '').length;
+                if (currentScore > previousScore) records[previousIndex] = rec;
+                continue;
+            }
+
+            recordIndexesByUrl.set(rec.listingUrl, records.length);
             records.push(rec);
         }
     }

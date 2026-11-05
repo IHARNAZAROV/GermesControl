@@ -159,18 +159,28 @@ for real imported data.
 
 The user confirmed that Bizlida export prices are BYN. They explicitly require
 Bizlida to participate in all listing comparisons/statistics, but never in
-contract checks because its export has no contracts.
+contract checks. The newer detailed export has no dedicated contract column,
+but some listings embed a contract number in the full description; the user
+wants that number used only as a fallback matching key when the address is not
+specific enough.
 
 **Why:** the user supplied a headerless, seven-column scraped listing export
-with shortened descriptions, not structured property or contract data. Many
-ads omit a house number or any address, so apparent absence can mean there
-was not enough information for an unambiguous match.
+with shortened descriptions, then a detailed six-column export with full
+descriptions. In a sample of 40 current listings, only 22 had an explicit
+contract marker. Many ads omit a house number or any address, so apparent
+absence can mean there was not enough information for an unambiguous match.
 
 **How to apply:** preserve unknown fields as unknown; do not invent house
 numbers, default every locality to Lida, or use the agency's boilerplate office
 address. Do not resolve equal-strength candidates by list order. Settlement
 information may be inside another source's full address even when its city
 field contains only the district.
+
+Use an explicit «Договор …» marker from the full description as a separate
+matching key, only when a specific house-level address is unavailable. Keep
+Bizlida excluded from contract-presence, contract-form, and missing-contract
+checks; absence of a description contract is not an error. A complete,
+conflicting address still blocks this fallback.
 
 For incomplete Bizlida addresses, favor an unconfirmed match over falsely
 confirming coverage. Same town/street + same price + a generic property type

@@ -69,6 +69,29 @@ function compactContains(a, b) {
     return before && after;
 }
 
+function addressHouseParts(address) {
+    const normalized = cleanLocationText(address);
+    const match = normalized.match(/(?:^|\s)(\d+[a-zа-яё]?)(?:\s+к\s*(\d+[a-zа-яё]?))?$/iu);
+    if (!match) return null;
+    const street = normalized.slice(0, match.index).trim();
+    if (!street) return null;
+    return { street, house: match[1], corpus: match[2] || null };
+}
+
+function hasConflictingHouseNumbering(addressA, addressB) {
+    const partsA = addressHouseParts(addressA);
+    const partsB = addressHouseParts(addressB);
+    if (!partsA || !partsB) return false;
+
+    const streetTokensA = tokenSet(partsA.street);
+    const streetTokensB = tokenSet(partsB.street);
+    if (!isFuzzyAddressSubsetMatch(streetTokensA, streetTokensB)) return false;
+
+    // Номер дома и корпус — часть идентичности адреса. Пропуск корпуса
+    // не должен превращать «60» в «60 корпус 2».
+    return partsA.house !== partsB.house || partsA.corpus !== partsB.corpus;
+}
+
 function fieldsDiffer(a, b, field) {
     // Отсутствующее поле не является расхождением: его нельзя сравнивать
     // с фактическим значением и нельзя выдавать догадку за ошибку.
@@ -113,6 +136,7 @@ function recordContractKey(record) {
         ?? record.number
         ?? record.contractKey
         ?? record.key
+        ?? record.matchingContractKey
     ));
 }
 
@@ -345,6 +369,7 @@ function addressMatches(a, b) {
     const addressB = recordAddressKey(bizlidaPair ? bizlidaAddressRecord(b) : b);
     if (!addressA || !addressB) return false;
     if (addressA === addressB) return true;
+    if (hasConflictingHouseNumbering(addressA, addressB)) return false;
 
     const tokensA = tokenSet(addressA);
     const tokensB = tokenSet(addressB);
@@ -437,9 +462,14 @@ function buildMatchGroups(bySource) {
             const specificAddressMatch = hasSpecificHouseAddress(rec) && existingRecords.some((existing) => (
                 hasSpecificHouseAddress(existing) && addressMatches(rec, existing)
             ));
+            const contractMatch = existingRecords.some((existing) => {
+                const key = recordContractKey(rec);
+                return key && key === recordContractKey(existing);
+            });
             // При неполном адресе проверяем ВСЮ группу, а не только удобную
             // пару: сведения сайта не должны скрывать противоречие с ILVO.
-            if (!specificAddressMatch && existingRecords.some((existing) => (
+            // Явный договор — отдельное основание для связи, если адрес неполный.
+            if (!specificAddressMatch && !contractMatch && existingRecords.some((existing) => (
                 conflictingBizlidaCharacteristics(rec, existing)
             ))) return null;
         }
@@ -449,9 +479,14 @@ function buildMatchGroups(bySource) {
             const isBizlida = rec.source === 'bizlida' || existing.source === 'bizlida';
             if (isBizlida && rec.city && (existing.city || existing.address) && !bizlidaCityMatches(rec, existing)) continue;
             const existingContractKey = recordContractKey(existing);
-            const contractMatch = !!(recContractKey && existingContractKey && recContractKey === existingContractKey);
+            let contractMatch = !!(recContractKey && existingContractKey && recContractKey === existingContractKey);
             let addressMatch = addressMatches(rec, existing);
             const priceMatch = pricesMatch(rec, existing);
+            if (isBizlida && contractMatch) {
+                // Для Bizlida договор служит запасным ключом, когда хотя бы
+                // у одной стороны нет точного адреса с номером дома.
+                contractMatch = !hasSpecificHouseAddress(rec) || !hasSpecificHouseAddress(existing);
+            }
             // Улица без дома не идентифицирует объявление. Для Bizlida
             // требуем цену и ещё один параметр либо точный заголовок.
             const specificAddress = hasSpecificHouseAddress(rec) && hasSpecificHouseAddress(existing) && addressMatch;
