@@ -310,6 +310,7 @@ export function renderErrors(container) {
     let activeTab = 'all';
     let viewMode = 'grouped';
     let query = '';
+    const collapsedGroups = new Set();
     const tabs = el('div', { class: 'errors-tabs' }, [
         el('span', { class: 'filter-chip active', onclick: (e) => setTab('all', e) }, `Все (${errors.length})`),
         el('span', { class: 'filter-chip', onclick: (e) => setTab('critical', e) }, `Критические (${errors.filter((x) => x.severity === 'critical').length})`),
@@ -384,18 +385,37 @@ export function renderErrors(container) {
         });
         return Array.from(groups.entries())
             .sort(([first], [second]) => first.localeCompare(second, 'ru'))
-            .map(([type, groupRows]) => el('section', { class: 'error-group' }, [
-                el('div', { class: 'error-group-header' }, [
-                    el('div', { class: 'error-group-title' }, type),
-                    el('span', { class: 'badge badge-neutral' }, `${groupRows.length}`)
-                ]),
-                renderDataTable({
+            .map(([type, groupRows]) => {
+                const isCollapsed = collapsedGroups.has(type);
+                const header = el('button', {
+                    type: 'button',
+                    class: 'error-group-header',
+                    'aria-expanded': String(!isCollapsed)
+                }, [
+                    el('span', { class: 'error-group-title' }, type),
+                    el('span', { class: 'badge badge-neutral error-group-count' }, `${groupRows.length}`),
+                    el('span', { class: 'error-group-chevron', 'aria-hidden': 'true' }, '\u2304')
+                ]);
+                const content = el('div', { class: 'error-group-content' }, renderDataTable({
                     columns: errorColumns(report, false),
                     rows: groupRows,
                     pageSize: 50,
                     emptyText: 'Ошибок не найдено'
-                })
-            ]));
+                }));
+                content.hidden = isCollapsed;
+                const section = el('section', {
+                    class: `error-group${isCollapsed ? ' is-collapsed' : ''}`
+                }, [header, content]);
+                header.addEventListener('click', () => {
+                    const shouldCollapse = !content.hidden;
+                    content.hidden = shouldCollapse;
+                    header.setAttribute('aria-expanded', String(!shouldCollapse));
+                    section.classList.toggle('is-collapsed', shouldCollapse);
+                    if (shouldCollapse) collapsedGroups.add(type);
+                    else collapsedGroups.delete(type);
+                });
+                return section;
+            });
     }
 
     function draw() {
