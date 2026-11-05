@@ -16,20 +16,14 @@ function row(id, title, description = '', price = '120 000') {
         `https://bizlida.by/baraholka/${id}`, title, description, price, '28 октября, 18:09'];
 }
 
-async function parseSheets(sheets, context) {
+async function parseRows(rows, context) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bizlida-'));
     context.after(() => fs.rmSync(dir, { recursive: true, force: true }));
     const file = path.join(dir, 'export.xlsx');
     const wb = XLSX.utils.book_new();
-    sheets.forEach((rows, index) => {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), `Объявления ${index + 1}`);
-    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Объявления');
     XLSX.writeFile(wb, file);
     return parseBizlidaXlsx(file);
-}
-
-async function parseRows(rows, context) {
-    return parseSheets([rows], context);
 }
 
 function rec(source, extra = {}) {
@@ -68,7 +62,7 @@ test('Bizlida keeps the first headerless row, BYN prices, URL, photo, and all se
     assert.equal(records[1].rooms, 1);
 });
 
-test('Bizlida imports the detailed six-column export and deduplicates repeated sheets', async (t) => {
+test('Bizlida imports the detailed six-column single-sheet export', async (t) => {
     const row = [
         'https://bizlida.by/baraholka/136143',
         'ПРОДАМ\n:\n Дом мансардного типа на улице Доватора',
@@ -92,7 +86,7 @@ test('Bizlida imports the detailed six-column export and deduplicates repeated s
         row,
         ambiguousContractRow
     ];
-    const records = await parseSheets([sheet, sheet], t);
+    const records = await parseRows(sheet, t);
     assert.equal(records.length, 2);
     assert.equal(records[0].id, '136143');
     assert.equal(records[0].title, 'Дом мансардного типа на улице Доватора');

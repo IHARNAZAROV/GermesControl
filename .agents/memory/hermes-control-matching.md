@@ -162,13 +162,16 @@ Bizlida to participate in all listing comparisons/statistics, but never in
 contract checks. The newer detailed export has no dedicated contract column,
 but some listings embed a contract number in the full description; the user
 wants that number used only as a fallback matching key when the address is not
-specific enough.
+specific enough. Current exports always contain one worksheet; a second tab in
+one supplied workbook was accidental.
 
 **Why:** the user supplied a headerless, seven-column scraped listing export
 with shortened descriptions, then a detailed six-column export with full
 descriptions. In a sample of 40 current listings, only 22 had an explicit
-contract marker. Many ads omit a house number or any address, so apparent
-absence can mean there was not enough information for an unambiguous match.
+contract marker. The user confirmed the detailed export always has one sheet;
+the duplicate tab was a mistake. Many ads omit a house number or any address,
+so apparent absence can mean there was not enough information for an
+unambiguous match.
 
 **How to apply:** preserve unknown fields as unknown; do not invent house
 numbers, default every locality to Lida, or use the agency's boilerplate office
