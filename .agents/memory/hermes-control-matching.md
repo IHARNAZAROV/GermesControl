@@ -209,3 +209,19 @@ incompatible also creates unnecessary missed matches.
 
 **How to apply:** use explicit source text, preserve absent information, and
 keep equal-strength candidates unconfirmed rather than choosing by order.
+
+## Completeness before absence
+
+Treat automatic Bizlida acquisition as all-or-nothing. A failed or
+unverifiable crawl is not evidence that advertisements have disappeared.
+An unexpected zero-agency result requires review rather than replacing
+the last successful snapshot.
+
+**Why:** this product uses missing advertisements to identify publication
+problems. Accepting a partial or unexpectedly empty scrape would create
+false missing-listing errors across the agency's inventory.
+
+**How to apply:** retain the last successful source and its actual timestamp
+on acquisition failures; run a new comparison only after a complete import.
+Keep acquisition failure distinct from a comparison failure after data
+has already been successfully saved.

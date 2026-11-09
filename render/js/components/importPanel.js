@@ -1,5 +1,5 @@
 import { el, formatDateTime, sourceLogo } from '../format.js';
-import { store, importSource, importSiteFromUrl, importKufarFromUrl, runCheck } from '../state.js';
+import { store, importSource, importSiteFromUrl, importKufarFromUrl, importBizlidaFromUrl, runCheck } from '../state.js';
 import { openModal, closeModal } from './modal.js';
 import { showToast } from './toast.js';
 
@@ -7,7 +7,7 @@ const SOURCE_META = {
     site: { label: 'Сайт ГермесГарант', format: 'JSON', hint: 'Автоматическая выгрузка с сайта' },
     ilvo: { label: 'ILVO CRM', format: 'XLSX', hint: 'Ручная выгрузка объектов из ILVO' },
     kufar: { label: 'Kufar', format: 'XML', hint: 'Автоматическая выгрузка объявлений из ILVO' },
-    bizlida: { label: 'Bizlida', format: 'XLSX', hint: 'Выгрузка объявлений bizlida.by без договоров' }
+    bizlida: { label: 'Bizlida', format: 'Сайт / XLSX', hint: 'Прямое обновление объявлений агентства' }
 };
 
 async function afterImport(onChanged) {
@@ -28,7 +28,7 @@ function sourceCard(key, onChanged) {
     const info = src.meta || {};
 
     const card = el('div', { class: 'card import-card' });
-    const status = info.count
+    const status = info.importedAt
         ? el('span', { class: `badge ${info.isDemo ? 'badge-warning' : 'badge-success'}` }, info.isDemo ? 'Демо-данные' : '\u2713 Загружено')
         : el('span', { class: 'badge badge-danger' }, 'Нет данных');
 
@@ -43,6 +43,36 @@ function sourceCard(key, onChanged) {
     card.appendChild(el('div', { class: 'text-secondary', style: 'font-size:11.5px;' }, info.importedAt ? formatDateTime(info.importedAt) : ''));
 
     const actions = el('div', { class: 'import-actions' });
+    if (key === 'bizlida') {
+        actions.appendChild(el('button', {
+            class: 'btn btn-primary btn-sm',
+            disabled: store.bizlidaUpdating,
+            onclick: async () => {
+                const pending = importBizlidaFromUrl(onChanged);
+                onChanged();
+                try {
+                    const res = await pending;
+                    showToast(`Bizlida: ${res.count} объектов, ${res.pages} стр. ${res.checkError ? '' : 'Сверка завершена.'}`, 'success');
+                    if (res.checkError) showToast(res.checkError, 'error');
+                } catch (err) {
+                    showToast(err.message || 'Не удалось обновить Bizlida. Предыдущие данные сохранены.', 'error');
+                } finally {
+                    onChanged();
+                }
+            }
+        }, store.bizlidaUpdating ? 'Обновление…' : 'Обновить Bizlida'));
+        const progress = store.bizlidaProgress;
+        const progressText = !store.bizlidaUpdating
+            ? 'Последняя успешная загрузка указана выше. При ошибке данные не заменяются.'
+            : progress?.phase === 'listings' ? `Карточки: ${progress.completed} из ${progress.total}`
+                : progress?.phase === 'checking' ? 'Данные сохранены. Выполняется сверка…'
+                    : progress?.phase === 'saving' || progress?.phase === 'complete' ? 'Сохранение полного результата…'
+                        : `Обход страниц: ${progress?.page || 1}${progress?.total > 1 ? ` из ${progress.total}` : ''}`;
+        card.appendChild(el('div', {
+            class: 'text-secondary', role: 'status', 'aria-live': 'polite',
+            style: 'font-size:12px;margin-top:8px;'
+        }, progressText));
+    }
     if (key === 'site') {
         actions.appendChild(el('button', {
             class: 'btn btn-primary btn-sm',
@@ -73,7 +103,8 @@ function sourceCard(key, onChanged) {
         }, 'Из файла'));
     } else if (key === 'ilvo' || key === 'bizlida') {
         actions.appendChild(el('button', {
-            class: 'btn btn-primary btn-sm',
+            class: key === 'bizlida' ? 'btn btn-ghost btn-sm' : 'btn btn-primary btn-sm',
+            disabled: key === 'bizlida' && store.bizlidaUpdating,
             onclick: async () => {
                 try {
                     const res = await importSource(key);
@@ -85,7 +116,7 @@ function sourceCard(key, onChanged) {
                     showToast(err.message || 'Ошибка загрузки файла', 'error');
                 }
             }
-        }, `Загрузить ${meta.format}`));
+        }, key === 'bizlida' ? 'Из XLSX' : `Загрузить ${meta.format}`));
     } else {
         actions.appendChild(el('button', {
             class: 'btn btn-secondary btn-sm',
@@ -124,10 +155,12 @@ function sourceCard(key, onChanged) {
 }
 
 export function openImportModal() {
-    const grid = el('div', { class: 'import-grid' });
+    const grid = el('div', { class: 'import-grid', id: 'import-source-grid' });
     function draw() {
-        grid.innerHTML = '';
-        ['site', 'ilvo', 'kufar', 'bizlida'].forEach((key) => grid.appendChild(sourceCard(key, draw)));
+        // An update may continue after closing/reopening the modal.
+        const target = document.getElementById('import-source-grid') || grid;
+        target.innerHTML = '';
+        ['site', 'ilvo', 'kufar', 'bizlida'].forEach((key) => target.appendChild(sourceCard(key, draw)));
     }
     draw();
 
@@ -136,7 +169,7 @@ export function openImportModal() {
         kicker: 'Источники данных',
         width: '720px',
         body: [
-            el('p', { class: 'card-subtitle', style: 'margin-bottom:16px;' }, 'Сайт ГермесГарант обновляется автоматически, ILVO и Bizlida загружаются из XLSX, Kufar — из XML. Для Bizlida: 7 колонок (фото, агентство, ссылка, заголовок, описание, цена BYN, дата), без договоров. После загрузки запустите проверку.'),
+            el('p', { class: 'card-subtitle', style: 'margin-bottom:16px;' }, 'Bizlida: кнопка «Обновить Bizlida» обходит все страницы раздела и загружает полные карточки ГермесГаранта. После успешной загрузки сверка запускается автоматически. Это может занять несколько минут. XLSX остаётся запасным способом. ILVO — из XLSX, Kufar — из XML.'),
             grid
         ],
         footer: [el('button', { class: 'btn btn-secondary', onclick: closeModal }, 'Закрыть')]

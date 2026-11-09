@@ -542,6 +542,36 @@ function refreshBizlidaRecord(record) {
     return refreshed;
 }
 
+function parseBizlidaListing(listing) {
+    const title = cleanBizlidaTitle(listing.title);
+    const description = [listing.lead, listing.description].filter(Boolean).join('\n\n');
+    const rec = finalizeRecord({
+        id: listing.id,
+        title,
+        description,
+        ...bizlidaProperties(title, description),
+        livingArea: extractNumberNear(propertyDescription(description),
+            /(?:жил[а-яё]*\s+площад[а-яё]*|площад[а-яё]*\s+жил[а-яё]*(?:\s+помещен[а-яё]*)?)[^0-9]{0,15}(\d+(?:[.,]\d+)?)/iu),
+        kitchenArea: extractNumberNear(propertyDescription(description),
+            /(?:площад[а-яё]*\s+кухни|кухня|кухни)[^0-9]{0,15}(\d+(?:[.,]\d+)?)/iu),
+        dealType: listing.dealType,
+        price: listing.price,
+        priceUsd: null,
+        contractNumber: null,
+        status: 'active',
+        photos: listing.photos
+    }, 'bizlida', listing.id);
+    return {
+        ...rec,
+        listingUrl: listing.listingUrl,
+        matchingContractKey: extractBizlidaMatchingContractKey(listing.description),
+        publishedText: listing.publishedText,
+        updatedText: listing.updatedText,
+        seller: listing.seller,
+        fetchedAt: listing.fetchedAt
+    };
+}
+
 async function parseBizlidaXlsx(filePath) {
     const wb = XLSX.readFile(filePath);
     const records = [];
@@ -644,6 +674,7 @@ async function parseBizlidaXlsx(filePath) {
 }
 
 module.exports = {
+    parseBizlidaListing,
     parseSiteJson,
     parseSiteJsonContent,
     parseIlvoXlsx,

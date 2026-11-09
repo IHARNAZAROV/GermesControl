@@ -7,7 +7,9 @@ export const store = {
     report: null,
     history: [],
     settings: {},
-    checking: false
+    checking: false,
+    bizlidaUpdating: false,
+    bizlidaProgress: null
 };
 
 export function subscribe(fn) {
@@ -54,6 +56,26 @@ export async function importKufarFromUrl(url) {
     const result = await window.electronAPI.importKufarFromUrl(url);
     await loadState();
     return result;
+}
+
+export async function importBizlidaFromUrl(onProgress) {
+    if (store.bizlidaUpdating) throw new Error('Обновление Bizlida уже выполняется.');
+    store.bizlidaUpdating = true;
+    const unsubscribe = window.electronAPI.onBizlidaProgress((progress) => {
+        store.bizlidaProgress = progress;
+        if (onProgress) onProgress(progress);
+    });
+    notify();
+    try {
+        const result = await window.electronAPI.importBizlidaFromUrl();
+        await loadState();
+        return result;
+    } finally {
+        unsubscribe();
+        store.bizlidaUpdating = false;
+        store.bizlidaProgress = null;
+        notify();
+    }
 }
 
 export async function runCheck() {

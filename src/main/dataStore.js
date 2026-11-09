@@ -122,12 +122,19 @@ function getState() {
 
 function saveState(state) {
     ensureDirs();
-    fs.writeJsonSync(STATE_FILE, state, { spaces: 2 });
+    const tempPath = `${STATE_FILE}.tmp`;
+    try {
+        fs.writeJsonSync(tempPath, state, { spaces: 2 });
+        fs.renameSync(tempPath, STATE_FILE);
+    } finally {
+        fs.removeSync(tempPath);
+    }
     stateCache = state;
 }
 
 function setSourceData(sourceKey, records, meta) {
-    const state = getState();
+    // Do not mutate the cached successful snapshot before the disk write succeeds.
+    const state = structuredClone(getState());
     const isRealImport = meta && meta.isDemo === false;
     if (isRealImport) {
         // Демо-источники нельзя смешивать с первым реальным импортом:
@@ -138,10 +145,17 @@ function setSourceData(sourceKey, records, meta) {
             }
         }
         state.contracts = [];
-        fs.removeSync(REPORT_FILE);
     }
     state.sources[sourceKey] = { data: records, meta: { ...defaultMeta(), ...meta, count: records.length, importedAt: new Date().toISOString() } };
     saveState(state);
+    if (isRealImport) {
+        try {
+            fs.removeSync(REPORT_FILE);
+        } catch (error) {
+            error.sourceDataSaved = true;
+            throw error;
+        }
+    }
     return state;
 }
 
@@ -164,10 +178,10 @@ function copyUploadedFile(sourceKey, originalPath) {
 
 function saveRawContent(sourceKey, fileNameHint, content) {
     ensureDirs();
-    const ts = dayjs().format('YYYYMMDD-HHmmss');
+    const ts = dayjs().format('YYYYMMDD-HHmmss-SSS');
     const dest = path.join(UPLOADS_DIR, sourceKey, `${ts}-${fileNameHint}`);
     fs.writeFileSync(dest, content);
-    pruneUploadedFiles(sourceKey, [dest]);
+    pruneUploadedFiles(sourceKey, [dest, getState().sources[sourceKey]?.meta?.storedPath]);
     return dest;
 }
 

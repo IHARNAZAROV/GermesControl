@@ -181,7 +181,7 @@ export function renderSettings(container) {
                 sourceEndpointRow('site', 'Сайт ГермесГарант', SITE_JSON_URL, 'Автозагрузка JSON по URL'),
                 sourceEndpointRow('ilvo', 'ILVO CRM', 'XLSX', 'Ручная загрузка файла'),
                 sourceEndpointRow('kufar', 'Kufar', s.kufarXmlUrl || '—', 'XML-фид через ILVO Posting'),
-                sourceEndpointRow('bizlida', 'Bizlida', 'Ручной импорт XLSX', '7 колонок, цена BYN; без договоров')
+                sourceEndpointRow('bizlida', 'Bizlida', 'https://bizlida.by/baraholka/cat/37', 'Прямое обновление по кнопке и сверка; XLSX — запасной способ')
             ]),
             el('div', { class: 'settings-inline-field' }, [
                 el('label', { for: 'set-kufar-url' }, 'Ссылка XML-фида Kufar'),

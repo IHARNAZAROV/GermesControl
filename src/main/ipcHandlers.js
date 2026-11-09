@@ -14,6 +14,8 @@ const {
 const { runComparison } = require('./compare');
 const { generateReport, REPORT_LABELS } = require('./reports');
 const { SOURCES } = require('./schema');
+const { scrapeBizlida } = require('./bizlidaScraper');
+let bizlidaUpdating = false;
 
 const FILE_FILTERS = {
     site: [{ name: 'JSON', extensions: ['json'] }],
@@ -35,11 +37,13 @@ function buildFullState() {
         contracts: state.contracts,
         report: lastReport,
         history,
+        bizlidaUpdating,
         settings: store.settings.store
     };
 }
 
 async function importFromPath(sourceKey, filePath) {
+    if (sourceKey === 'bizlida' && bizlidaUpdating) throw new Error('Дождитесь завершения обновления Bizlida.');
     let records;
     if (sourceKey === 'site') records = await parseSiteJson(filePath);
     else if (sourceKey === 'ilvo') records = await parseIlvoXlsx(filePath);
@@ -52,10 +56,28 @@ async function importFromPath(sourceKey, filePath) {
     return { sourceKey, count: records.length, fileName: path.basename(filePath) };
 }
 
+function runCurrentCheck() {
+    const state = store.getState();
+    const allSourcesAreDemo = ['site', 'ilvo', 'kufar']
+        .every((key) => state.sources[key]?.meta?.isDemo === true);
+    const report = runComparison({
+        site: state.sources.site?.data || [],
+        ilvo: state.sources.ilvo?.data || [],
+        kufar: state.sources.kufar?.data || [],
+        bizlida: state.sources.bizlida?.data || [],
+        contracts: state.contracts || [],
+        includeContractRegistry: allSourcesAreDemo
+    }, store.getLastReport());
+    store.saveLastReport(report);
+    store.appendHistory({ checkedAt: report.checkedAt, stats: report.stats, categories: report.categories });
+    return report;
+}
+
 function registerIpcHandlers(getMainWindow) {
     ipcMain.handle('app:getState', async () => buildFullState());
 
     ipcMain.handle('app:selectAndImportFile', async (evt, sourceKey) => {
+        if (sourceKey === 'bizlida' && bizlidaUpdating) throw new Error('Дождитесь завершения обновления Bizlida.');
         const win = getMainWindow();
         const { canceled, filePaths } = await dialog.showOpenDialog(win, {
             title: `Загрузить ${SOURCES[sourceKey].label}`,
@@ -130,29 +152,55 @@ function registerIpcHandlers(getMainWindow) {
         }
     });
 
+    ipcMain.handle('app:importBizlidaFromUrl', async () => {
+        if (bizlidaUpdating) throw new Error('Обновление Bizlida уже выполняется.');
+        bizlidaUpdating = true;
+        const sendProgress = (progress) => {
+            const win = getMainWindow();
+            if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+                try {
+                    win.webContents.send('app:bizlidaProgress', progress);
+                } catch (error) {
+                    // Closing a window must not interrupt a successful data transaction.
+                    console.warn('Не удалось показать ход обновления Bizlida:', error.message);
+                }
+            }
+        };
+        try {
+            const snapshot = await scrapeBizlida({ onProgress: sendProgress });
+            sendProgress({ phase: 'saving', total: snapshot.records.length });
+            const storedPath = store.saveRawContent('bizlida', 'bizlida-snapshot.json', JSON.stringify(snapshot, null, 2));
+            store.setSourceData('bizlida', snapshot.records, {
+                fileName: 'Bizlida (прямое обновление)',
+                storedPath,
+                sourceUrl: snapshot.sourceUrl,
+                pages: snapshot.pages,
+                completedAt: snapshot.completedAt,
+                complete: true,
+                isDemo: false
+            });
+            let checkError = null;
+            try {
+                sendProgress({ phase: 'checking', total: snapshot.records.length });
+                runCurrentCheck();
+            } catch (error) {
+                checkError = `Данные Bizlida сохранены, но сверка не завершена: ${error.message}`;
+            }
+            return { count: snapshot.records.length, pages: snapshot.pages, checkError };
+        } catch (error) {
+            if (error.sourceDataSaved) {
+                throw new Error(`Данные Bizlida сохранены, но предыдущий отчёт не удалось сбросить. Запустите сверку повторно. ${error.message}`);
+            }
+            throw new Error(`Обновление Bizlida не завершено. Последний успешный результат не заменён. ${error.message}`);
+        } finally {
+            bizlidaUpdating = false;
+            sendProgress({ phase: 'idle' });
+        }
+    });
+
     ipcMain.handle('app:runCheck', async () => {
-        const state = store.getState();
-        const previous = store.getLastReport();
-        const site = (state.sources.site && state.sources.site.data) || [];
-        const ilvo = (state.sources.ilvo && state.sources.ilvo.data) || [];
-        const kufar = (state.sources.kufar && state.sources.kufar.data) || [];
-        const sourceKeys = ['site', 'ilvo', 'kufar'];
-        const allSourcesAreDemo = sourceKeys.every((sourceKey) => state.sources[sourceKey]?.meta?.isDemo === true);
-        const report = runComparison({
-            site,
-            ilvo,
-            kufar,
-            bizlida: state.sources.bizlida?.data || [],
-            contracts: state.contracts || [],
-            includeContractRegistry: allSourcesAreDemo
-        }, previous);
-        store.saveLastReport(report);
-        store.appendHistory({
-            checkedAt: report.checkedAt,
-            stats: report.stats,
-            categories: report.categories
-        });
-        return report;
+        if (bizlidaUpdating) throw new Error('Дождитесь завершения обновления Bizlida: после него сверка запустится автоматически.');
+        return runCurrentCheck();
     });
 
     ipcMain.handle('app:getSettings', async () => store.settings.store);
