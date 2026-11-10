@@ -15,7 +15,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 15;
+const REPORT_MATCHING_VERSION = 16;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -113,6 +113,9 @@ function fieldsDiffer(a, b, field) {
         const addressKeyA = normalizeAddressKey(null, a);
         const addressKeyB = normalizeAddressKey(null, b);
         if (addressKeyA && addressKeyA === addressKeyB) return false;
+        // Не позволяем короткой записи «дом 6» скрыть иной корпус
+        // или отличающийся номер дома при последующем subset-сравнении.
+        if (hasConflictingHouseNumbering(a, b)) return true;
 
         const ca = cleanLocationText(a);
         const cb = cleanLocationText(b);

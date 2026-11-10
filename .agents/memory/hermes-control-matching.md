@@ -36,6 +36,22 @@ containment first, then a whitespace-stripped substring check, before
 flagging a real mismatch — keep both checks if address comparison is ever
 reworked, or the noise returns.
 
+## House and corpus notation
+
+For this project's address feeds, `6/2`, `6к2`, `6к 2`, `6-2`, and
+`6 корпус 2` represent the same house/corpus notation. Apply the same
+normalization in matching and field comparison, without equating different
+corpus numbers or dropping a known corpus.
+
+**Why:** the user supplied the same Пролыгина property with these different
+source conventions. Treating slash notation differently caused a false
+address error, while losing the compact corpus during text extraction
+created a separate unconfirmed Bizlida record.
+
+**How to apply:** preserve literal house letters such as `6а`; treat `к`
+as a corpus marker only when followed by its number. Do not infer a corpus
+number absent from the source.
+
 ## Unicode normalization caveat
 JavaScript `\b` is ASCII-oriented even with the `u` flag, so it is not a
 reliable boundary for Cyrillic words or abbreviations such as `Договор` and

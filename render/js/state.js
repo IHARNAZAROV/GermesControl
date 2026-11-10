@@ -1,5 +1,5 @@
 const listeners = new Set();
-const REPORT_MATCHING_VERSION = 15;
+const REPORT_MATCHING_VERSION = 16;
 
 export const store = {
     sources: { site: { data: [], meta: {} }, ilvo: { data: [], meta: {} }, kufar: { data: [], meta: {} }, bizlida: { data: [], meta: {} } },
