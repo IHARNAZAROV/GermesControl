@@ -14,6 +14,7 @@ export function renderDataTable({
     pageSize = 50,
     initialSortKey = null,
     initialSortDir = 1,
+    dateOrder = null,
     tableClassName = '',
     onRowClick = null,
     rowLabel = null
@@ -35,7 +36,31 @@ export function renderDataTable({
         oninput: (e) => { query = e.target.value.toLowerCase(); page = 0; renderBody(); }
     });
     if (searchFields.length) toolbar.appendChild(searchInput);
-    if (searchFields.length) wrap.appendChild(toolbar);
+    let orderSelect = null;
+    if (dateOrder) {
+        sortKey = '__date';
+        sortDir = dateOrder.direction ?? -1;
+        orderSelect = el('select', {
+            class: 'select-input',
+            'aria-label': 'Порядок объектов',
+            title: 'По дате договора; без даты — в конце. При одинаковой дате — по номеру объекта.',
+            onchange: (event) => {
+                if (!event.target.value) return;
+                sortKey = '__date';
+                sortDir = Number(event.target.value);
+                dateOrder.onDirectionChange?.(sortDir);
+                page = 0;
+                renderBody();
+            }
+        }, [
+            el('option', { value: '-1' }, 'Сначала новые'),
+            el('option', { value: '1' }, 'Сначала старые'),
+            el('option', { value: '', disabled: true }, 'По столбцу')
+        ]);
+        orderSelect.value = String(sortDir);
+        toolbar.appendChild(orderSelect);
+    }
+    if (searchFields.length || dateOrder) wrap.appendChild(toolbar);
 
     const tableWrap = el('div', { class: 'table-wrap' });
     const tableClass = ['data-table', columns.length > 8 ? 'data-table--dense' : '', tableClassName]
@@ -49,6 +74,8 @@ export function renderDataTable({
             'data-column-key': col.key,
             onclick: () => {
                 if (sortKey === col.key) sortDir = -sortDir; else { sortKey = col.key; sortDir = 1; }
+                if (orderSelect) orderSelect.value = '';
+                page = 0;
                 renderBody();
             }
         }, col.label);
@@ -69,7 +96,9 @@ export function renderDataTable({
             ? normalizedRows.filter((entry) => entry.searchText.includes(query))
             : normalizedRows;
         let filtered = filteredEntries.map((entry) => entry.row);
-        if (sortKey) {
+        if (sortKey === '__date' && dateOrder) {
+            filtered = filtered.slice().sort((a, b) => dateOrder.compare(a, b, sortDir));
+        } else if (sortKey) {
             const col = columns.find((c) => c.key === sortKey);
             filtered = filtered.slice().sort((a, b) => {
                 const va = col.sortValue ? col.sortValue(a) : a[sortKey];

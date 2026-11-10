@@ -2,6 +2,7 @@ import { el, formatMoney, formatShortDate, icon, sourceLogo } from '../format.js
 import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
 import { openModal, closeModal } from '../components/modal.js';
+import { createObjectDateOrder } from '../objectOrder.js';
 
 function presenceChip(present, label, variant = '', unconfirmed = false) {
     const sold = variant === 'sold';
@@ -393,6 +394,8 @@ export function renderObjects(container) {
     }
 
     let activeFilter = 'all';
+    let dateDirection = -1;
+    const compareDates = createObjectDateOrder(report.contracts);
     const card = el('div', { class: 'card card-pad' });
     const chips = el('div', { class: 'table-toolbar' }, [
         el('span', { class: 'filter-chip active', onclick: (e) => setFilter('all', e) }, `Все (${report.objects.length})`),
@@ -444,6 +447,11 @@ export function renderObjects(container) {
                 { key: 'status', label: 'Статус', render: (o) => statusBadge(o.status, o.listingStatus, o.listingStatusDate) }
             ],
             rows,
+            dateOrder: {
+                compare: compareDates,
+                direction: dateDirection,
+                onDirectionChange: (direction) => { dateDirection = direction; }
+            },
             searchFields: ['objectNumber', 'title', 'city', 'address', 'contractNumber'],
             emptyText: 'Объекты не найдены',
             tableClassName: 'data-table--objects',
