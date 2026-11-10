@@ -15,7 +15,7 @@ const {
 } = require('./schema');
 
 const COMPARABLE_FIELDS = OBJECT_FIELDS.filter((f) => f.compare && f.key !== 'contractNumber');
-const REPORT_MATCHING_VERSION = 14;
+const REPORT_MATCHING_VERSION = 15;
 
 function tokenSet(s) {
     return new Set(String(s || '').split(/\s+/).filter(Boolean));
@@ -419,7 +419,7 @@ function conflictingBizlidaCharacteristics(a, b) {
 }
 
 function bizlidaDescriptorEvidence(a, b, locationMatch, streetMatch) {
-    if (!pricesMatch(a, b) || !compatiblePropertyType(a, b)) return false;
+    if (!compatiblePropertyType(a, b)) return false;
     const evidence = additionalEvidence(a, b);
     if (evidence.conflicts.length) return false;
     const area = hasRecordValue(a.totalArea) && hasRecordValue(b.totalArea)
@@ -428,6 +428,13 @@ function bizlidaDescriptorEvidence(a, b, locationMatch, streetMatch) {
         && numericValuesMatch(a.rooms, b.rooms, 0);
     const floors = hasRecordValue(a.floors) && hasRecordValue(b.floors)
         && numericValuesMatch(a.floors, b.floors, 0);
+    if (!pricesMatch(a, b)) {
+        // Price is not identity. Permit a stale price only with independent,
+        // corroborated property evidence, never with a town/type alone.
+        const specificDetails = evidence.matches.filter((key) => ['year', 'plot', 'distance', 'snb'].includes(key));
+        return locationMatch && ((area && specificDetails.length >= 2)
+            || (streetMatch && area && rooms && floors));
+    }
     if (locationMatch) {
         // Улица/деревня с подтверждающей характеристикой. Тип сам по себе
         // не считается характеристикой, год/участок/этажность — считаются.
@@ -742,7 +749,12 @@ function runComparison({ site, ilvo, kufar, bizlida, contracts = [], includeCont
             }
         }
 
-        if (listingStatus === 'active') {
+        const unconfirmedBizlida = !!b && !s && !i && !k;
+        if (listingStatus === 'active' && unconfirmedBizlida) {
+            pushError(ERROR_TYPES.MATCH_UNCONFIRMED,
+                'Объявление Bizlida загружено, но не удалось уверенно сопоставить его с объектом в других источниках. Это не подтверждает отсутствие объекта.',
+                target, SOURCE_LABELS.bizlida);
+        } else if (listingStatus === 'active') {
             for (const key of sourceKeys) {
                 if (!presence[key]) pushError(ERROR_TYPES[`MISSING_${key.toUpperCase()}`],
                     `Объект есть в других источниках, но отсутствует в ${SOURCE_LABELS[key]}`, target,
@@ -752,6 +764,7 @@ function runComparison({ site, ilvo, kufar, bizlida, contracts = [], includeCont
 
         const hasMissingSource = listingStatus === 'active' && presentSourcesCount < sourceKeys.length;
         let status = listingStatus === 'sold' ? 'ok' : (hasMissingSource ? 'missing' : 'ok');
+        if (unconfirmedBizlida && listingStatus === 'active') status = 'unconfirmed';
         // Любая ошибка, относящаяся к этой карточке, должна отражаться
         // в её статусе, а не только расхождения полей из COMPARABLE_FIELDS.
         const hasObjectErrors = errors.some((error) => (
@@ -897,13 +910,13 @@ function runComparison({ site, ilvo, kufar, bizlida, contracts = [], includeCont
     const soldObjects = objects.filter((o) => o.listingStatus === 'sold');
     const inactiveObjects = objects.filter((o) => o.listingStatus === 'inactive');
     const everywhere = activeObjects.filter((o) => sourceKeys.every((key) => o.presence[key])).length;
-    const categories = { everywhere };
+    const categories = { everywhere, unconfirmed: activeObjects.filter((o) => o.status === 'unconfirmed').length };
     for (const key of SRC_ORDER) {
         const suffix = key.charAt(0).toUpperCase() + key.slice(1);
         categories[`only${suffix}`] = activeObjects.filter((o) => o.presence[key]
             && sourceKeys.every((other) => other === key || !o.presence[other])).length;
         categories[`missing${suffix}`] = sourceKeys.includes(key)
-            ? activeObjects.filter((o) => !o.presence[key]).length : 0;
+            ? activeObjects.filter((o) => o.status !== 'unconfirmed' && !o.presence[key]).length : 0;
     }
 
     const stats = {

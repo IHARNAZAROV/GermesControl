@@ -3,13 +3,14 @@ import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
 import { openModal, closeModal } from '../components/modal.js';
 
-function presenceChip(present, label, variant = '') {
+function presenceChip(present, label, variant = '', unconfirmed = false) {
     const sold = variant === 'sold';
+    const unknown = !present && unconfirmed;
     return el('span', {
-        class: `presence-chip ${sold ? 'warn' : (present ? 'ok' : 'no')}`,
-        title: sold ? 'Есть в JSON сайта, но снят с продажи' : label,
-        'aria-label': sold ? 'Есть в JSON сайта, но снят с продажи' : (present ? 'Объект найден' : 'Объект отсутствует')
-    }, sold ? '\u2212' : (present ? '\u2713' : '\u00D7'));
+        class: `presence-chip ${sold || unknown ? 'warn' : (present ? 'ok' : 'no')}`,
+        title: unknown ? 'Сопоставление не подтверждено' : sold ? 'Есть в JSON сайта, но снят с продажи' : label,
+        'aria-label': unknown ? 'Сопоставление не подтверждено' : sold ? 'Есть в JSON сайта, но снят с продажи' : (present ? 'Объект найден' : 'Объект отсутствует')
+    }, unknown ? '?' : sold ? '\u2212' : (present ? '\u2713' : '\u00D7'));
 }
 
 function statusBadge(status, listingStatus, listingStatusDate) {
@@ -28,6 +29,7 @@ function statusBadge(status, listingStatus, listingStatusDate) {
         }, `Неактивен в ILVO${date}`);
     }
     if (status === 'ok') return el('span', { class: 'badge badge-success' }, '\u2713 ок');
+    if (status === 'unconfirmed') return el('span', { class: 'badge badge-warning' }, 'Сопоставление не подтверждено');
     if (status === 'missing') return el('span', { class: 'badge badge-danger' }, '\u00D7 отсутствует');
     return el('span', { class: 'badge badge-warning' }, '\u26A0 расхождение');
 }
@@ -395,7 +397,8 @@ export function renderObjects(container) {
     const chips = el('div', { class: 'table-toolbar' }, [
         el('span', { class: 'filter-chip active', onclick: (e) => setFilter('all', e) }, `Все (${report.objects.length})`),
         el('span', { class: 'filter-chip', onclick: (e) => setFilter('problem', e) }, `Проблемные (${report.objects.filter((o) => o.status !== 'ok').length})`),
-        el('span', { class: 'filter-chip', onclick: (e) => setFilter('missing', e) }, `Отсутствующие (${report.objects.filter((o) => o.status === 'missing').length})`)
+        el('span', { class: 'filter-chip', onclick: (e) => setFilter('missing', e) }, `Отсутствующие (${report.objects.filter((o) => o.status === 'missing').length})`),
+        el('span', { class: 'filter-chip', onclick: (e) => setFilter('unconfirmed', e) }, `Не сопоставлены (${report.objects.filter((o) => o.status === 'unconfirmed').length})`)
     ]);
     const tableHolder = el('div');
     card.appendChild(chips);
@@ -413,6 +416,7 @@ export function renderObjects(container) {
         let rows = report.objects;
         if (activeFilter === 'problem') rows = rows.filter((o) => o.status !== 'ok');
         if (activeFilter === 'missing') rows = rows.filter((o) => o.status === 'missing');
+        if (activeFilter === 'unconfirmed') rows = rows.filter((o) => o.status === 'unconfirmed');
         // Старые сохранённые отчёты могли быть созданы без objectNumber.
         // Номер восстанавливается по исходному порядку, а не по текущему
         // фильтру, поэтому он остаётся стабильным во всех вкладках.
@@ -431,10 +435,11 @@ export function renderObjects(container) {
                 { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => presenceChip(
                     o.presence.site,
                     o.listingStatus === 'sold' ? 'Есть в JSON сайта, но снят с продажи' : undefined,
-                    o.listingStatus === 'sold' ? 'sold' : ''
+                    o.listingStatus === 'sold' ? 'sold' : '',
+                    o.status === 'unconfirmed'
                 ) },
-                { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => presenceChip(o.presence.ilvo) },
-                { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => presenceChip(o.presence.kufar) },
+                { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => presenceChip(o.presence.ilvo, undefined, '', o.status === 'unconfirmed') },
+                { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => presenceChip(o.presence.kufar, undefined, '', o.status === 'unconfirmed') },
                 { key: 'bizlida', label: 'Bizlida', sortValue: (o) => o.presence.bizlida, render: (o) => presenceChip(o.presence.bizlida) },
                 { key: 'status', label: 'Статус', render: (o) => statusBadge(o.status, o.listingStatus, o.listingStatusDate) }
             ],

@@ -88,7 +88,7 @@ data during imports.
 scan descriptions or silently default an absent value.
 
 ## Descriptor fallback safety
-The price-plus-attributes fallback may join records only when the prices match,
+The general price-plus-attributes fallback may join records only when the prices match,
 at least two strong attributes are available and all available strong
 attributes agree. A known conflict in type, rooms, or total area blocks the
 fallback.
@@ -100,6 +100,18 @@ created several downstream false errors.
 **How to apply:** treat contract as the primary key and address as the normal
 fallback; use descriptors only as a conservative last resort with conflict
 rejection.
+
+For Bizlida, a stale price must not prevent recognition when location and
+independent property details establish identity. The stricter price-independent
+route requires substantially more evidence than the price-supported route;
+never relax location or known-conflict safeguards just to increase coverage.
+
+**Why:** the comparison is meant to discover stale prices. Making equal price
+an unconditional prerequisite hides price discrepancies behind false missing ads.
+
+**How to apply:** keep price comparison against ILVO separate from identity.
+Treat unmatched Bizlida-only records as unconfirmed warnings, not proof of
+absence from the agency's base, including in counts and exports.
 
 ## Duplicate presentation keys
 The normalized contract key is also the deduplication key for repeated rows

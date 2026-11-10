@@ -116,6 +116,7 @@ function renderStatusCard(report) {
     const segments = [
         { label: 'Без расхождений', value: objects.filter((object) => object.status === 'ok').length, color: STATUS_COLORS.ok },
         { label: 'Отсутствует источник', value: objects.filter((object) => object.status === 'missing').length, color: STATUS_COLORS.missing },
+        { label: 'Не сопоставлены', value: objects.filter((object) => object.status === 'unconfirmed').length, color: STATUS_COLORS.missing },
         { label: 'Есть расхождение', value: objects.filter((object) => object.status === 'mismatch').length, color: STATUS_COLORS.mismatch }
     ];
     const total = objects.length;
@@ -267,7 +268,8 @@ function renderAttentionTable(report) {
                 {
                     key: 'status',
                     label: 'Состояние',
-                    render: (object) => object.status === 'missing' ? 'Неполное покрытие' : 'Расхождение'
+                    render: (object) => object.status === 'unconfirmed' ? 'Сопоставление не подтверждено'
+                        : object.status === 'missing' ? 'Неполное покрытие' : 'Расхождение'
                 }
             ],
             rows,

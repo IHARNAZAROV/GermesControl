@@ -87,7 +87,8 @@ test('embeds two native colored Excel charts linked to the summary', async () =>
     assert.match(chartOne, /'Сводка'!\$A\$20:\$A\$23/u);
     assert.match(chartOne, /<c:v>Bizlida<\/c:v>/u);
     assert.match(chartOne, /srgbClr val="155945"/u);
-    assert.match(chartTwo, /'Сводка'!\$A\$27:\$A\$31/u);
+    assert.match(chartTwo, /'Сводка'!\$A\$27:\$A\$32/u);
+    assert.match(chartTwo, /Сопоставление не подтверждено/u);
     assert.match(chartTwo, /srgbClr val="D97706"/u);
     assert.match(drawing, /<xdr:col>4<\/xdr:col>/u);
     assert.match(sheet, /<drawing r:id="rIdChart"\/>/u);

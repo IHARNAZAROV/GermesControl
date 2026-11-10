@@ -23,9 +23,13 @@ function extractBizlidaLocation(title, description) {
             const words = match[1].split(/\s+/);
             localities.push(words.length > 1 && !/(?:ая|яя|ое|ее|ий|ый|ой)$/u.test(words[0]) ? words[0] : match[1]);
         }
-        for (const match of text.matchAll(streetPattern)) {
-            if (/^(?:д|деревн|аг)(?:\.|$)/iu.test(match[1])) continue;
-            streets.push({ name: match[1].trim(), house: match[2], corpus: match[3] });
+        for (const line of text.split(/\r?\n/u)) {
+            for (const match of line.matchAll(streetPattern)) {
+                // «Удобства находятся на улице» followed by a new paragraph
+                // «Дом ...» must not turn into the street name «Дом».
+                if (/^(?:д|деревн|аг)(?:\.|$)/iu.test(match[1])) continue;
+                streets.push({ name: match[1].trim(), house: match[2], corpus: match[3] });
+            }
         }
     }
     let city = localities[0] || null;
@@ -53,6 +57,20 @@ function numberMatch(text, pattern) {
     return match ? Number(match[1].replace(',', '.')) : null;
 }
 
+function extractBizlidaTotalArea(description) {
+    const text = propertyDescription(description).replace(
+        /(?:общ[а-яё]*\s+)?площад[а-яё]*\s+(?:квартиры\s+)?по\s+СНБ[^0-9]{0,25}\d+(?:[.,]\d+)?(?:\s*(?:кв\.?\s*)?м[²23]?)?/giu, ''
+    );
+    for (const match of text.matchAll(/общ[а-яё]*\s+(?:площад[а-яё]*|пл\.)[^0-9]{0,35}(\d+(?:[.,]\d+)?)/giu)) {
+        const after = text.slice(match.index + match[0].length);
+        if (/^\s*(?:сот|га(?=$|[\s,.])|гектар)/iu.test(after)) continue;
+        const clause = text.slice(0, match.index).split(/[.!?\n]/u).at(-1) + match[0];
+        if (/участ[а-яё]*(?:(?!дом|строен|квартир)[^.!?\n])*$/iu.test(clause)) continue;
+        return Number(match[1].replace(',', '.'));
+    }
+    return null;
+}
+
 // Эти признаки применяются к каждой стороне сравнения, а не только к XLSX.
 // Не смешиваем общую площадь и площадь по СНБ, не используем цену как ID.
 function propertyFeatures(record) {
@@ -60,7 +78,7 @@ function propertyFeatures(record) {
     return {
         year: numberMatch(text, /((?:19|20)\d{2})\s*(?:г\.?\s*п\.?|года\s+постройки)/u)
             || numberMatch(text, /постро[а-я]*\s+в\s+((?:19|20)\d{2})/u),
-        plot: numberMatch(text, /(?:участ[а-я]*\s*[:—–-]?\s*(?:(?:площадью|в)\s*)?|на\s+)(\d+(?:[.,]\d+)?)\s*сот/u),
+        plot: numberMatch(text, /(\d+(?:[.,]\d+)?)\s*сот(?:ок|к[а-я]*|\.|(?=$|[\s,.]))/u),
         snb: numberMatch(text, /(?:площад[а-я]*\s*)?по\s+снб[^0-9]{0,25}(\d+(?:[.,]\d+)?)/u),
         distance: numberMatch(text, /(?:всего\s+)?(?:в\s+)?(\d+(?:[.,]\d+)?)\s*(?:км|километр[а-я]*)\s+от\s+(?:центра\s+)?(?:города\s+)?лид/u),
         pond: /собственн[а-я]*\s+(?:живописн[а-я]*\s+)?пруд/u.test(text),
@@ -95,4 +113,4 @@ function additionalEvidence(a, b) {
     return { matches, conflicts };
 }
 
-module.exports = { propertyDescription, extractBizlidaLocation, propertyFeatures, compatiblePropertyType, additionalEvidence };
+module.exports = { propertyDescription, extractBizlidaLocation, extractBizlidaTotalArea, propertyFeatures, compatiblePropertyType, additionalEvidence };

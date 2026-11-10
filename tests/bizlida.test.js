@@ -177,9 +177,12 @@ test('Bizlida-only listings are included everywhere except contract validation a
     assert.equal(report.stats.withoutContract, 0);
     assert.equal(report.contracts.length, 0);
     assert.ok(!report.errors.some((e) => /договор/u.test(e.type)));
-    assert.equal(report.categories.missingSite, 1);
-    assert.equal(report.categories.missingIlvo, 1);
-    assert.equal(report.categories.missingKufar, 1);
+    assert.equal(report.categories.missingSite, 0);
+    assert.equal(report.categories.missingIlvo, 0);
+    assert.equal(report.categories.missingKufar, 0);
+    assert.equal(report.categories.unconfirmed, 1);
+    assert.equal(report.objects[0].status, 'unconfirmed');
+    assert.ok(report.errors.some((e) => e.type === 'Не удалось уверенно сопоставить'));
 });
 
 test('Bizlida contract is a fallback match key, not a contract-compliance value', async (t) => {

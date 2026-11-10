@@ -13,7 +13,7 @@ const {
 
 const NUMERIC_KEYS = new Set(OBJECT_FIELDS.filter((f) => f.numeric).map((f) => f.key));
 const SITE_BASE_URL = 'https://germesgarant.by';
-const { propertyDescription, extractBizlidaLocation } = require('./bizlida');
+const { propertyDescription, extractBizlidaLocation, extractBizlidaTotalArea } = require('./bizlida');
 
 function toNumberOrNull(v) {
     if (v === undefined || v === null || v === '') return null;
@@ -502,9 +502,6 @@ function bizlidaProperties(title, description) {
         : /квартир|евродвуш|комнатная\s+Чешка/iu.test(title) ? 'Квартира'
         : /дача|дачн/iu.test(title) ? 'Дача'
         : /дом|коттедж|незаверш[а-яё]*\s+строен/iu.test(title) ? 'Дом' : null;
-    const withoutSnb = safeDescription.replace(
-        /(?:общ[а-яё]*\s+)?площад[а-яё]*\s+(?:квартиры\s+)?по\s+СНБ[^0-9]{0,25}\d+(?:[.,]\d+)?(?:\s*(?:кв\.?\s*)?м[²23]?)?/giu, ''
-    );
     return {
         type,
         ...extractBizlidaLocation(title, description),
@@ -513,8 +510,7 @@ function bizlidaProperties(title, description) {
                 : /тр[её]хкомнат/iu.test(text) ? 3 : /четыр[её]хкомнат/iu.test(text) ? 4 : null),
         // Единицы могли не попасть в обрезанное «Общая площадь 62,1 …».
         // СНБ в эту величину не включаем.
-        totalArea: extractNumberNear(withoutSnb,
-            /общ[а-яё]*\s+(?:площад[а-яё]*|пл\.)[^0-9]{0,35}(\d+(?:[.,]\d+)?)/iu),
+        totalArea: extractBizlidaTotalArea(description),
         floor: extractFloorFromText(safeDescription),
         floors: extractFloorsFromText(text)
     };
@@ -526,7 +522,7 @@ function cleanBizlidaTitle(value) {
 
 function extractBizlidaMatchingContractKey(description) {
     const matches = [...String(description || '').replace(/\u00a0/g, ' ').matchAll(
-        /(?:^|[^0-9A-Za-zА-Яа-яЁё])договор(?:а|у|ом|е)?\s*(?:(?:№|#|n[oо]?\.?)\s*)?(\d+\s*[/-]\s*[0-9A-Za-zА-Яа-яЁё]+|\d+[A-Za-zА-Яа-яЁё]*)(?=$|[^0-9A-Za-zА-Яа-яЁё])/giu
+        /(?:^|[^0-9A-Za-zА-Яа-яЁё])договор(?:а|у|ом|е)?(?:\s+(?:оказания|на\s+оказание)\s+(?:(?:риелтерских|риэлтерских)\s+)?услуг)?\s*(?:(?:№|#|n[oо]?\.?)\s*)?(\d+\s*[/-]\s*[0-9A-Za-zА-Яа-яЁё]+|\d+[A-Za-zА-Яа-яЁё]*)(?=$|[^0-9A-Za-zА-Яа-яЁё])/giu
     )].map((match) => extractContractKey(match[0])).filter(Boolean);
     const uniqueKeys = [...new Set(matches)];
     // Если в тексте явно указаны разные договоры, не выбираем один наугад.
@@ -537,7 +533,11 @@ function refreshBizlidaRecord(record) {
     // У старых импортов сохранены оригинальные тексты: повторно выбирать
     // XLSX не нужно. Не переинтерпретируем сторонние структурированные записи.
     if (!record?.listingUrl?.includes('bizlida.by/baraholka/')) return record;
-    const refreshed = { ...record, ...bizlidaProperties(record.title, record.description) };
+    const refreshed = {
+        ...record,
+        ...bizlidaProperties(record.title, record.description),
+        matchingContractKey: extractBizlidaMatchingContractKey(record.description)
+    };
     refreshed.addressKey = normalizeAddressKey(refreshed.city, refreshed.address);
     return refreshed;
 }

@@ -24,6 +24,7 @@ const SOURCE_LABELS = {
 const SOURCE_KEYS = Object.keys(SOURCE_LABELS);
 
 const STATUS_LABELS = {
+    unconfirmed: 'Сопоставление не подтверждено',
     active: 'Активен',
     inactive: 'Неактивен в ILVO',
     sold: 'Снят с продажи',
@@ -460,6 +461,7 @@ function reportSpecificSummary(reportType, rows, report) {
         ['ОК', objects.filter((object) => object.status === 'ok').length],
         ['Неполное покрытие', objects.filter((object) => object.status === 'missing').length],
         ['Расхождение', objects.filter((object) => object.status === 'mismatch').length],
+        ['Сопоставление не подтверждено', objects.filter((object) => object.status === 'unconfirmed').length],
         ['Сняты с продажи', objects.filter((object) => object.listingStatus === 'sold').length],
         ['Неактивны в ILVO', objects.filter((object) => object.listingStatus === 'inactive').length]
     ];

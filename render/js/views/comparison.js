@@ -2,16 +2,18 @@ import { el, formatShortDate, sourceLogo, icon } from '../format.js';
 import { store } from '../state.js';
 import { renderDataTable } from '../components/table.js';
 
-function chip(present, sold = false) {
+function chip(present, sold = false, unconfirmed = false) {
     const soldLabel = 'Есть в JSON сайта, но снят с продажи';
+    const unknown = !present && unconfirmed;
     return el('span', {
-        class: `presence-chip ${sold ? 'warn' : (present ? 'ok' : 'no')}`,
-        title: sold ? soldLabel : undefined,
-        'aria-label': sold ? soldLabel : (present ? 'Объект найден' : 'Объект отсутствует')
-    }, sold ? '\u2212' : (present ? '\u2713' : '\u00D7'));
+        class: `presence-chip ${sold || unknown ? 'warn' : (present ? 'ok' : 'no')}`,
+        title: unknown ? 'Сопоставление не подтверждено' : sold ? soldLabel : undefined,
+        'aria-label': unknown ? 'Сопоставление не подтверждено' : sold ? soldLabel : (present ? 'Объект найден' : 'Объект отсутствует')
+    }, unknown ? '?' : sold ? '\u2212' : (present ? '\u2713' : '\u00D7'));
 }
 
 function listingBadge(object) {
+    if (object.status === 'unconfirmed') return el('span', { class: 'badge badge-warning' }, 'Сопоставление не подтверждено');
     if (object.listingStatus === 'inactive') {
         const date = object.listingStatusDate ? ` · ${formatShortDate(object.listingStatusDate)}` : '';
         return el('span', { class: 'badge badge-warning' }, `Неактивен в ILVO${date}`);
@@ -88,9 +90,9 @@ export function renderComparison(container) {
             columns: [
                 { key: 'objectNumber', label: '№' },
                 { key: 'title', label: 'Объект', render: (o) => o.title || '—' },
-                { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => chip(o.presence.site, o.listingStatus === 'sold') },
-                { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => chip(o.presence.ilvo) },
-                { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => chip(o.presence.kufar) },
+                { key: 'site', label: 'Сайт', sortValue: (o) => o.presence.site, render: (o) => chip(o.presence.site, o.listingStatus === 'sold', o.status === 'unconfirmed') },
+                { key: 'ilvo', label: 'ILVO', sortValue: (o) => o.presence.ilvo, render: (o) => chip(o.presence.ilvo, false, o.status === 'unconfirmed') },
+                { key: 'kufar', label: 'Kufar', sortValue: (o) => o.presence.kufar, render: (o) => chip(o.presence.kufar, false, o.status === 'unconfirmed') },
                 { key: 'bizlida', label: 'Bizlida', sortValue: (o) => o.presence.bizlida, render: (o) => chip(o.presence.bizlida) },
                 { key: 'listingStatus', label: 'Статус размещения', render: listingBadge }
             ],
